@@ -260,6 +260,19 @@ struct JobCardView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             }
+
+            // Delete button for non-processing jobs
+            if !job.status.isProcessing {
+                Button {
+                    processingVM.removeJob(job)
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.red)
+                .help("Remove from queue")
+            }
         }
     }
 }

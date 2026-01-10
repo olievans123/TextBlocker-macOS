@@ -145,6 +145,10 @@ class ProcessingViewModel: ObservableObject {
         }
     }
 
+    func removeJob(_ job: ProcessingJob) {
+        jobs.removeAll { $0.id == job.id }
+    }
+
     // MARK: - Core Processing Pipeline
 
     private func processJob(_ job: ProcessingJob) async {

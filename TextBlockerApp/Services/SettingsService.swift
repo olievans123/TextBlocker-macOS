@@ -95,7 +95,7 @@ class SettingsService: ObservableObject {
     }
 
     init() {
-        self.ocrHeight = defaults.object(forKey: ocrHeightKey) as? Int ?? 360
+        self.ocrHeight = defaults.object(forKey: ocrHeightKey) as? Int ?? 480
         self.sampleFPS = defaults.object(forKey: sampleFPSKey) as? Double ?? 1.0
         self.padding = defaults.object(forKey: paddingKey) as? Int ?? 14
         self.mergePad = defaults.object(forKey: mergePadKey) as? Int ?? 6
@@ -108,7 +108,8 @@ class SettingsService: ObservableObject {
         let qualityRaw = defaults.string(forKey: qualityKey) ?? VideoQuality.balanced.rawValue
         self.quality = VideoQuality(rawValue: qualityRaw) ?? .balanced
 
-        self.languages = defaults.object(forKey: languagesKey) as? [String] ?? ["en"]
+        // Include common Western languages by default for better text detection
+        self.languages = defaults.object(forKey: languagesKey) as? [String] ?? ["en", "fr", "de", "es", "it", "pt", "nl"]
     }
 
     func applyPreset(_ preset: Preset) {
@@ -120,5 +121,19 @@ class SettingsService: ObservableObject {
         forceInterval = preset.forceInterval
         quality = VideoQuality(rawValue: preset.quality) ?? .balanced
         selectedPresetName = preset.name
+    }
+
+    func resetToDefaults() {
+        ocrHeight = 480
+        sampleFPS = 1.0
+        padding = 14
+        mergePad = 6
+        sceneThreshold = 8
+        forceInterval = 2.0
+        maxFilters = 1200
+        skipSimilar = true
+        quality = .balanced
+        languages = ["en", "fr", "de", "es", "it", "pt", "nl"]
+        selectedPresetName = "Default"
     }
 }

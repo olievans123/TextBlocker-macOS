@@ -116,6 +116,14 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+
+            // Reset Section
+            Section {
+                Button("Reset All Settings to Defaults") {
+                    settings.resetToDefaults()
+                }
+                .foregroundColor(.red)
+            }
         }
         .formStyle(.grouped)
         .frame(minWidth: 450)

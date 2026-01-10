@@ -122,12 +122,22 @@ struct JobCardView: View {
             // Progress bar for active jobs
             if job.status.isProcessing {
                 VStack(alignment: .leading, spacing: 4) {
-                    ProgressView(value: job.status.progress)
+                    ProgressView(value: job.status.overallProgress)
                         .progressViewStyle(.linear)
 
-                    Text("\(Int(job.status.progress * 100))%")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    HStack {
+                        Text("\(Int(job.status.overallProgress * 100))%")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        if let eta = job.formattedTimeRemaining {
+                            Text(eta)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
             }
 

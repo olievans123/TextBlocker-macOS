@@ -55,6 +55,27 @@ enum JobStatus: Equatable {
             return 0
         }
     }
+
+    /// Overall progress across all phases (0-1)
+    /// extracting (0-33%), detecting (33-66%), encoding (66-100%)
+    var overallProgress: Double {
+        switch self {
+        case .pending:
+            return 0
+        case .downloading(let p):
+            return p * 0.1  // 0-10%
+        case .extracting(let p):
+            return 0.1 + p * 0.23  // 10-33%
+        case .detecting(let p):
+            return 0.33 + p * 0.33  // 33-66%
+        case .encoding(let p):
+            return 0.66 + p * 0.34  // 66-100%
+        case .completed:
+            return 1
+        case .failed:
+            return 0
+        }
+    }
 }
 
 class ProcessingJob: Identifiable, ObservableObject {
@@ -65,9 +86,19 @@ class ProcessingJob: Identifiable, ObservableObject {
     let title: String
     let createdAt: Date
 
-    @Published var status: JobStatus = .pending
+    @Published var status: JobStatus = .pending {
+        didSet {
+            // Track when processing actually starts
+            if processingStartTime == nil && status.isProcessing {
+                processingStartTime = Date()
+            }
+        }
+    }
     @Published var outputURL: URL?
     @Published var detectedRegions: Int = 0
+
+    /// When processing started (for ETA calculation)
+    var processingStartTime: Date?
 
     init(inputURL: URL, type: JobType, sourceURL: String? = nil, title: String? = nil) {
         self.inputURL = inputURL
@@ -75,5 +106,35 @@ class ProcessingJob: Identifiable, ObservableObject {
         self.sourceURL = sourceURL
         self.title = title ?? inputURL.deletingPathExtension().lastPathComponent
         self.createdAt = Date()
+    }
+
+    /// Estimated time remaining based on progress and elapsed time
+    var estimatedTimeRemaining: TimeInterval? {
+        guard let startTime = processingStartTime,
+              status.overallProgress > 0.05 else { return nil }
+
+        let elapsed = Date().timeIntervalSince(startTime)
+        let progress = status.overallProgress
+        let totalEstimated = elapsed / progress
+        let remaining = totalEstimated - elapsed
+
+        return remaining > 0 ? remaining : nil
+    }
+
+    /// Format time remaining as human readable string
+    var formattedTimeRemaining: String? {
+        guard let remaining = estimatedTimeRemaining else { return nil }
+
+        if remaining < 60 {
+            return "\(Int(remaining))s remaining"
+        } else if remaining < 3600 {
+            let mins = Int(remaining / 60)
+            let secs = Int(remaining.truncatingRemainder(dividingBy: 60))
+            return "\(mins)m \(secs)s remaining"
+        } else {
+            let hours = Int(remaining / 3600)
+            let mins = Int((remaining.truncatingRemainder(dividingBy: 3600)) / 60)
+            return "\(hours)h \(mins)m remaining"
+        }
     }
 }

@@ -22,10 +22,24 @@
 		APP015 /* ProcessingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC015; };
 		APP016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = RES001; };
 		APP017 /* InputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC017; };
+		APP018 /* DependencyLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC018; };
+		TST001 /* TextBlockerAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TSTSRC001; };
+		TST002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FRM002; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		DEP001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = PRJ001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = TGT001;
+			remoteInfo = TextBlockerApp;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		PRD001 /* TextBlockerApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TextBlockerApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		PRD002 /* TextBlockerAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TextBlockerAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		SRC001 /* TextBlockerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBlockerApp.swift; sourceTree = "<group>"; };
 		SRC002 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		SRC005 /* QueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueView.swift; sourceTree = "<group>"; };
@@ -40,8 +54,11 @@
 		SRC014 /* YTDLPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YTDLPService.swift; sourceTree = "<group>"; };
 		SRC015 /* ProcessingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingViewModel.swift; sourceTree = "<group>"; };
 		SRC017 /* InputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputView.swift; sourceTree = "<group>"; };
+		SRC018 /* DependencyLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DependencyLocator.swift; sourceTree = "<group>"; };
+		TSTSRC001 /* TextBlockerAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBlockerAppTests.swift; sourceTree = "<group>"; };
 		RES001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		ENT001 /* TextBlocker.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TextBlocker.entitlements; sourceTree = "<group>"; };
+		FRM002 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +69,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		TSTFRM100 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TST002 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -59,6 +84,8 @@
 			isa = PBXGroup;
 			children = (
 				GRP002 /* TextBlockerApp */,
+				GRP009 /* TextBlockerAppTests */,
+				GRP010 /* Frameworks */,
 				GRP003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -81,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				PRD001 /* TextBlockerApp.app */,
+				PRD002 /* TextBlockerAppTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -103,6 +131,7 @@
 				SRC012 /* VisionOCRService.swift */,
 				SRC013 /* PerceptualHashService.swift */,
 				SRC014 /* YTDLPService.swift */,
+				SRC018 /* DependencyLocator.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -134,6 +163,22 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
+		GRP009 /* TextBlockerAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				TSTSRC001 /* TextBlockerAppTests.swift */,
+			);
+			path = TextBlockerAppTests;
+			sourceTree = "<group>";
+		};
+		GRP010 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				FRM002 /* XCTest.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -153,6 +198,24 @@
 			productName = TextBlockerApp;
 			productReference = PRD001 /* TextBlockerApp.app */;
 			productType = "com.apple.product-type.application";
+		};
+		TGT002 /* TextBlockerAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CFG004;
+			buildPhases = (
+				TSTSRC100 /* Sources */,
+				TSTFRM100 /* Frameworks */,
+				TSTRES100 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DEP002 /* PBXTargetDependency */,
+			);
+			name = TextBlockerAppTests;
+			productName = TextBlockerAppTests;
+			productReference = PRD002 /* TextBlockerAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -183,6 +246,7 @@
 			projectRoot = "";
 			targets = (
 				TGT001 /* TextBlockerApp */,
+				TGT002 /* TextBlockerAppTests */,
 			);
 		};
 /* End PBXProject section */
@@ -193,6 +257,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				APP016 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TSTRES100 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,10 +288,27 @@
 				APP014 /* YTDLPService.swift in Sources */,
 				APP015 /* ProcessingViewModel.swift in Sources */,
 				APP017 /* InputView.swift in Sources */,
+				APP018 /* DependencyLocator.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TSTSRC100 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TST001 /* TextBlockerAppTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		DEP002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = TGT001 /* TextBlockerApp */;
+			targetProxy = DEP001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		CFG101 /* Debug */ = {
@@ -395,6 +483,48 @@
 			};
 			name = Release;
 		};
+		CFG301 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TextBlockerAppTests;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.olievans.textblocker.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TextBlockerApp.app/Contents/MacOS/TextBlockerApp";
+			};
+			name = Debug;
+		};
+		CFG302 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TextBlockerAppTests;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.olievans.textblocker.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TextBlockerApp.app/Contents/MacOS/TextBlockerApp";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -412,6 +542,15 @@
 			buildConfigurations = (
 				CFG201 /* Debug */,
 				CFG202 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CFG004 /* Build configuration list for PBXNativeTarget "TextBlockerAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CFG301 /* Debug */,
+				CFG302 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

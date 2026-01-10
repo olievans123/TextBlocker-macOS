@@ -19,6 +19,17 @@ enum YTDLPError: LocalizedError {
     }
 }
 
+enum YTDLPProgressStage {
+    case downloading
+    case merging
+}
+
+struct YTDLPProgressUpdate {
+    let stage: YTDLPProgressStage
+    let progress: Double?
+    let message: String
+}
+
 struct YouTubeVideo: Identifiable {
     let id: String
     let title: String
@@ -31,8 +42,10 @@ actor YTDLPService {
 
     private let ytdlpPath: String
 
-    init(ytdlpPath: String = "/opt/homebrew/bin/yt-dlp") {
+    init(ytdlpPath: String? = nil) {
         self.ytdlpPath = ytdlpPath
+            ?? DependencyLocator.findExecutable(named: "yt-dlp")
+            ?? "/opt/homebrew/bin/yt-dlp"
     }
 
     // MARK: - Video Info
@@ -95,34 +108,55 @@ actor YTDLPService {
 
     // MARK: - Download
 
+    func outputURL(forTitle title: String, id: String, outputDir: URL) -> URL {
+        let sanitizedTitle = sanitizeFilename(title)
+        return outputDir.appendingPathComponent("\(sanitizedTitle)_\(id).mp4")
+    }
+
     func downloadVideo(
         url: String,
-        outputDir: URL,
-        format: String = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best",
-        progressHandler: @escaping @Sendable (Double, String) -> Void
+        outputURL: URL,
+        duration: Double?,
+        format: String = "best[height<=720][ext=mp4]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best",
+        progressHandler: @escaping @Sendable (YTDLPProgressUpdate) -> Void
     ) async throws -> URL {
-        let video = try await getVideoInfo(url: url)
-        let sanitizedTitle = sanitizeFilename(video.title)
-        let outputPath = outputDir.appendingPathComponent("\(sanitizedTitle)_\(video.id).mp4")
-
         try await runYTDLPWithProgress(
             args: [
+                "--force-overwrites",
                 "-f", format,
                 "--merge-output-format", "mp4",
-                "-o", outputPath.path,
+                "-o", outputURL.path,
                 url
             ],
+            duration: duration,
             progressHandler: progressHandler
         )
 
-        return outputPath
+        return outputURL
+    }
+
+    func downloadVideo(
+        url: String,
+        outputDir: URL,
+        format: String = "best[height<=720][ext=mp4]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best",
+        progressHandler: @escaping @Sendable (YTDLPProgressUpdate) -> Void
+    ) async throws -> URL {
+        let video = try await getVideoInfo(url: url)
+        let outputURL = outputURL(forTitle: video.title, id: video.id, outputDir: outputDir)
+        return try await downloadVideo(
+            url: url,
+            outputURL: outputURL,
+            duration: video.duration.map(Double.init),
+            format: format,
+            progressHandler: progressHandler
+        )
     }
 
     func downloadVideo(
         videoId: String,
         outputDir: URL,
-        format: String = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best",
-        progressHandler: @escaping @Sendable (Double, String) -> Void
+        format: String = "best[height<=720][ext=mp4]/bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best",
+        progressHandler: @escaping @Sendable (YTDLPProgressUpdate) -> Void
     ) async throws -> URL {
         let url = "https://www.youtube.com/watch?v=\(videoId)"
         return try await downloadVideo(
@@ -146,7 +180,8 @@ actor YTDLPService {
     }
 
     private func runYTDLP(args: [String]) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
+        try assertExecutableAvailable()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: self.ytdlpPath)
@@ -180,8 +215,10 @@ actor YTDLPService {
 
     private func runYTDLPWithProgress(
         args: [String],
-        progressHandler: @escaping @Sendable (Double, String) -> Void
+        duration: Double?,
+        progressHandler: @escaping @Sendable (YTDLPProgressUpdate) -> Void
     ) async throws {
+        try assertExecutableAvailable()
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
@@ -189,9 +226,38 @@ actor YTDLPService {
                 process.arguments = ["--newline"] + args
 
                 let pipe = Pipe()
-                let errorPipe = Pipe()
                 process.standardOutput = pipe
-                process.standardError = errorPipe
+                process.standardError = pipe
+
+                final class OutputBuffer: @unchecked Sendable {
+                    private let lock = NSLock()
+                    private var buffer = ""
+                    private let maxSize: Int
+
+                    init(maxSize: Int) {
+                        self.maxSize = maxSize
+                    }
+
+                    func append(_ text: String) {
+                        lock.lock()
+                        buffer.append(text)
+                        if buffer.count > maxSize {
+                            buffer = String(buffer.suffix(maxSize))
+                        }
+                        lock.unlock()
+                    }
+
+                    func snapshot() -> String {
+                        lock.lock()
+                        let value = buffer
+                        lock.unlock()
+                        return value
+                    }
+                }
+
+                let outputBuffer = OutputBuffer(maxSize: 20_000)
+                let progressState = ProgressState()
+                let mergeState = ProgressState()
 
                 // Parse progress output
                 pipe.fileHandleForReading.readabilityHandler = { handle in
@@ -199,16 +265,50 @@ actor YTDLPService {
                     guard !data.isEmpty,
                           let text = String(data: data, encoding: .utf8) else { return }
 
+                    outputBuffer.append(text)
                     for line in text.components(separatedBy: "\n") {
                         // Parse: [download]  45.2% of 100.00MiB at 5.00MiB/s
                         if line.contains("[download]") && line.contains("%") {
                             if let range = line.range(of: #"(\d+\.?\d*)%"#, options: .regularExpression) {
                                 let percentStr = line[range].dropLast()
                                 if let percent = Double(percentStr) {
+                                    let progress = percent / 100
+                                    progressState.update(progress)
                                     DispatchQueue.main.async {
-                                        progressHandler(percent / 100, line)
+                                        progressHandler(YTDLPProgressUpdate(
+                                            stage: .downloading,
+                                            progress: progress,
+                                            message: line
+                                        ))
                                     }
                                 }
+                            }
+                        } else if line.contains("time="),
+                                  let duration,
+                                  duration > 0,
+                                  let timeValue = parseFFmpegTime(line) {
+                            let progress = min(max(timeValue / duration, 0), 1)
+                            mergeState.update(progress)
+                            DispatchQueue.main.async {
+                                progressHandler(YTDLPProgressUpdate(
+                                    stage: .merging,
+                                    progress: progress,
+                                    message: line
+                                ))
+                            }
+                        } else if line.contains("[Merger]") ||
+                                    line.contains("Merging formats") ||
+                                    line.contains("[ffmpeg]") ||
+                                    line.contains("Post-processing") ||
+                                    line.contains("Fixing") ||
+                                    line.contains("Destination:") {
+                            let progress = mergeState.current()
+                            DispatchQueue.main.async {
+                                progressHandler(YTDLPProgressUpdate(
+                                    stage: .merging,
+                                    progress: progress > 0 ? progress : nil,
+                                    message: line
+                                ))
                             }
                         }
                     }
@@ -219,14 +319,22 @@ actor YTDLPService {
                     process.waitUntilExit()
 
                     pipe.fileHandleForReading.readabilityHandler = nil
+                    let remainingData = pipe.fileHandleForReading.readDataToEndOfFile()
+                    if let remainingText = String(data: remainingData, encoding: .utf8), !remainingText.isEmpty {
+                        outputBuffer.append(remainingText)
+                    }
 
                     if process.terminationStatus != 0 {
-                        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                        let errorOutput = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+                        let snapshot = outputBuffer.snapshot()
+                        let errorOutput = snapshot.isEmpty ? "Unknown error" : snapshot
                         continuation.resume(throwing: YTDLPError.processError(errorOutput))
                     } else {
                         DispatchQueue.main.async {
-                            progressHandler(1.0, "Complete")
+                            progressHandler(YTDLPProgressUpdate(
+                                stage: .merging,
+                                progress: 1.0,
+                                message: "Complete"
+                            ))
                         }
                         continuation.resume(returning: ())
                     }
@@ -236,4 +344,42 @@ actor YTDLPService {
             }
         }
     }
+
+    private final class ProgressState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value: Double = 0
+
+        func update(_ progress: Double) {
+            lock.lock()
+            value = progress
+            lock.unlock()
+        }
+
+        func current() -> Double {
+            lock.lock()
+            let progress = value
+            lock.unlock()
+            return progress
+        }
+    }
+
+    private func assertExecutableAvailable() throws {
+        guard FileManager.default.isExecutableFile(atPath: ytdlpPath) else {
+            throw YTDLPError.notInstalled
+        }
+    }
+}
+
+private func parseFFmpegTime(_ line: String) -> Double? {
+    guard let range = line.range(of: "time=") else { return nil }
+    let substring = line[range.upperBound...]
+    let timeToken = substring.split(separator: " ").first.map(String.init) ?? ""
+    let parts = timeToken.split(separator: ":").map(String.init)
+    guard parts.count == 3,
+          let hours = Double(parts[0]),
+          let minutes = Double(parts[1]),
+          let seconds = Double(parts[2]) else {
+        return nil
+    }
+    return hours * 3600 + minutes * 60 + seconds
 }

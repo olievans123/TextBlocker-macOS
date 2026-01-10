@@ -35,6 +35,8 @@ enum VideoQuality: String, CaseIterable, Identifiable {
 class SettingsService: ObservableObject {
     static let shared = SettingsService()
 
+    private static let defaultPreset = Preset.builtIn.first { $0.name == "Default" } ?? Preset.builtIn[0]
+
     private let defaults = UserDefaults.standard
 
     // Keys
@@ -100,18 +102,20 @@ class SettingsService: ObservableObject {
     }
 
     init() {
-        self.ocrHeight = defaults.object(forKey: ocrHeightKey) as? Int ?? 480
-        self.sampleFPS = defaults.object(forKey: sampleFPSKey) as? Double ?? 1.0
-        self.padding = defaults.object(forKey: paddingKey) as? Int ?? 14
-        self.mergePad = defaults.object(forKey: mergePadKey) as? Int ?? 6
-        self.sceneThreshold = defaults.object(forKey: sceneThresholdKey) as? Int ?? 8
-        self.forceInterval = defaults.object(forKey: forceIntervalKey) as? Double ?? 2.0
+        let preset = SettingsService.defaultPreset
+
+        self.ocrHeight = defaults.object(forKey: ocrHeightKey) as? Int ?? preset.ocrHeight
+        self.sampleFPS = defaults.object(forKey: sampleFPSKey) as? Double ?? preset.sampleFPS
+        self.padding = defaults.object(forKey: paddingKey) as? Int ?? preset.padding
+        self.mergePad = defaults.object(forKey: mergePadKey) as? Int ?? preset.mergePad
+        self.sceneThreshold = defaults.object(forKey: sceneThresholdKey) as? Int ?? preset.sceneThreshold
+        self.forceInterval = defaults.object(forKey: forceIntervalKey) as? Double ?? preset.forceInterval
         self.maxFilters = defaults.object(forKey: maxFiltersKey) as? Int ?? 1200
         self.skipSimilar = defaults.object(forKey: skipSimilarKey) as? Bool ?? true
-        self.useAccurateMode = defaults.object(forKey: useAccurateModeKey) as? Bool ?? true  // Default to accurate
-        self.selectedPresetName = defaults.string(forKey: selectedPresetKey) ?? "Default"
+        self.useAccurateMode = defaults.object(forKey: useAccurateModeKey) as? Bool ?? true
+        self.selectedPresetName = defaults.string(forKey: selectedPresetKey) ?? preset.name
 
-        let qualityRaw = defaults.string(forKey: qualityKey) ?? VideoQuality.balanced.rawValue
+        let qualityRaw = defaults.string(forKey: qualityKey) ?? preset.quality
         self.quality = VideoQuality(rawValue: qualityRaw) ?? .balanced
 
         // Include common Western languages by default for better text detection
@@ -130,17 +134,11 @@ class SettingsService: ObservableObject {
     }
 
     func resetToDefaults() {
-        ocrHeight = 720
-        sampleFPS = 2.0
-        padding = 18
-        mergePad = 10
-        sceneThreshold = 8
-        forceInterval = 2.0
+        let preset = SettingsService.defaultPreset
+        applyPreset(preset)
         maxFilters = 1200
         skipSimilar = true
         useAccurateMode = true
-        quality = .balanced
         languages = ["en", "fr", "de", "es", "it", "pt", "nl"]
-        selectedPresetName = "Default"
     }
 }

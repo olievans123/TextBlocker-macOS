@@ -9,6 +9,7 @@ enum JobType {
 enum JobStatus: Equatable {
     case pending
     case downloading(progress: Double)
+    case merging(progress: Double)
     case extracting(progress: Double)
     case detecting(progress: Double)
     case encoding(progress: Double)
@@ -30,7 +31,15 @@ enum JobStatus: Equatable {
         case .pending:
             return "Pending"
         case .downloading(let progress):
+            if progress >= 0.999 {
+                return "Download complete"
+            }
             return "Downloading \(Int(progress * 100))%"
+        case .merging(let progress):
+            if progress <= 0.0 {
+                return "Merging audio/video"
+            }
+            return "Merging \(Int(progress * 100))%"
         case .extracting(let progress):
             return "Extracting frames \(Int(progress * 100))%"
         case .detecting(let progress):
@@ -50,7 +59,7 @@ enum JobStatus: Equatable {
         switch self {
         case .pending, .cancelled, .failed:
             return 0
-        case .downloading(let p), .extracting(let p), .detecting(let p), .encoding(let p):
+        case .downloading(let p), .merging(let p), .extracting(let p), .detecting(let p), .encoding(let p):
             return p
         case .completed:
             return 1
@@ -65,6 +74,8 @@ enum JobStatus: Equatable {
             return 0
         case .downloading(let p):
             return p * 0.1  // 0-10%
+        case .merging(let p):
+            return 0.1 + p * 0.05  // 10-15%
         case .extracting(let p):
             return 0.1 + p * 0.23  // 10-33%
         case .detecting(let p):

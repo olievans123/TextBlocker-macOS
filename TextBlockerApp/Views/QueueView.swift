@@ -47,6 +47,7 @@ struct QueueView: View {
         processingVM.jobs.contains { job in
             if case .completed = job.status { return true }
             if case .failed = job.status { return true }
+            if case .cancelled = job.status { return true }
             return false
         }
     }
@@ -129,17 +130,21 @@ struct JobCardView: View {
             // Progress bar for active jobs
             if job.status.isProcessing {
                 VStack(alignment: .leading, spacing: 4) {
-                    ProgressView(value: job.status.overallProgress)
+                    ProgressView(value: job.status.progress)
                         .progressViewStyle(.linear)
 
                     HStack {
-                        Text("\(Int(job.status.overallProgress * 100))%")
+                        Text("\(Int(job.status.progress * 100))%")
                             .font(.caption2)
                             .foregroundColor(.secondary)
 
                         Spacer()
 
-                        if let eta = job.formattedTimeRemaining {
+                        if case .downloading = job.status {
+                            EmptyView()
+                        } else if case .merging = job.status {
+                            EmptyView()
+                        } else if let eta = job.formattedTimeRemaining {
                             Text(eta)
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
@@ -196,6 +201,8 @@ struct JobCardView: View {
                 Image(systemName: "clock")
             case .downloading:
                 Image(systemName: "arrow.down.circle")
+            case .merging:
+                Image(systemName: "arrow.triangle.2.circlepath")
             case .extracting:
                 Image(systemName: "film")
             case .detecting:
@@ -218,6 +225,7 @@ struct JobCardView: View {
         switch job.status {
         case .pending: return .secondary
         case .downloading: return .blue
+        case .merging: return .blue
         case .extracting: return .purple
         case .detecting: return .orange
         case .encoding: return .cyan
@@ -277,7 +285,11 @@ struct JobCardView: View {
     }
 }
 
-#Preview {
-    QueueView()
-        .environmentObject(ProcessingViewModel())
+#if DEBUG
+struct QueueView_Previews: PreviewProvider {
+    static var previews: some View {
+        QueueView()
+            .environmentObject(ProcessingViewModel())
+    }
 }
+#endif

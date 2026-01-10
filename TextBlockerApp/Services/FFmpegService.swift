@@ -35,11 +35,15 @@ actor FFmpegService {
     private let ffprobePath: String
 
     init(
-        ffmpegPath: String = "/opt/homebrew/bin/ffmpeg",
-        ffprobePath: String = "/opt/homebrew/bin/ffprobe"
+        ffmpegPath: String? = nil,
+        ffprobePath: String? = nil
     ) {
         self.ffmpegPath = ffmpegPath
+            ?? DependencyLocator.findExecutable(named: "ffmpeg")
+            ?? "/opt/homebrew/bin/ffmpeg"
         self.ffprobePath = ffprobePath
+            ?? DependencyLocator.findExecutable(named: "ffprobe")
+            ?? "/opt/homebrew/bin/ffprobe"
     }
 
     // MARK: - Video Info
@@ -182,7 +186,8 @@ actor FFmpegService {
     // MARK: - Private Methods
 
     private func runProcess(executable: String, args: [String]) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
+        try assertExecutableAvailable(executable)
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: executable)
@@ -219,6 +224,7 @@ actor FFmpegService {
         totalDuration: Double,
         progressHandler: @escaping @Sendable (Double) -> Void
     ) async throws {
+        try assertExecutableAvailable(ffmpegPath)
         // Use -progress pipe:1 to get progress updates
         let fullArgs = ["-progress", "pipe:1", "-nostats"] + args
 
@@ -234,7 +240,29 @@ actor FFmpegService {
                 process.standardError = errorPipe
 
                 // Track max progress to prevent going backwards
-                var maxProgress: Double = 0
+                final class ProgressState: @unchecked Sendable {
+                    private let lock = NSLock()
+                    private var maxProgress: Double = 0
+
+                    func shouldUpdate(_ progress: Double) -> Bool {
+                        lock.lock()
+                        let shouldUpdate = progress > maxProgress
+                        if shouldUpdate {
+                            maxProgress = progress
+                        }
+                        lock.unlock()
+                        return shouldUpdate
+                    }
+                }
+
+                let progressState = ProgressState()
+                let recordProgress: @Sendable (Double) -> Void = { progress in
+                    if progressState.shouldUpdate(progress) {
+                        DispatchQueue.main.async {
+                            progressHandler(progress)
+                        }
+                    }
+                }
 
                 // Parse progress output
                 pipe.fileHandleForReading.readabilityHandler = { handle in
@@ -249,24 +277,14 @@ actor FFmpegService {
                             if let us = Double(value), us > 0 {
                                 let seconds = us / 1_000_000
                                 let progress = min(max(seconds / totalDuration, 0), 1.0)
-                                if progress > maxProgress {
-                                    maxProgress = progress
-                                    DispatchQueue.main.async {
-                                        progressHandler(progress)
-                                    }
-                                }
+                                recordProgress(progress)
                             }
                         } else if line.hasPrefix("out_time_ms=") {
                             let value = line.replacingOccurrences(of: "out_time_ms=", with: "")
                             if let ms = Double(value), ms > 0 {
                                 let seconds = ms / 1_000
                                 let progress = min(max(seconds / totalDuration, 0), 1.0)
-                                if progress > maxProgress {
-                                    maxProgress = progress
-                                    DispatchQueue.main.async {
-                                        progressHandler(progress)
-                                    }
-                                }
+                                recordProgress(progress)
                             }
                         }
                     }
@@ -293,6 +311,12 @@ actor FFmpegService {
                     continuation.resume(throwing: error)
                 }
             }
+        }
+    }
+
+    private func assertExecutableAvailable(_ path: String) throws {
+        guard FileManager.default.isExecutableFile(atPath: path) else {
+            throw FFmpegError.notInstalled
         }
     }
 }

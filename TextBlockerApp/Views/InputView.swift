@@ -72,8 +72,9 @@ struct InputView: View {
                         .toggleStyle(.checkbox)
                         .onChange(of: urlText) { _, newValue in
                             // Auto-detect playlist
-                            if newValue.contains("playlist?list=") || newValue.contains("&list=") {
-                                isPlaylist = true
+                            let hasPlaylist = newValue.contains("playlist?list=") || newValue.contains("list=")
+                            if hasPlaylist != isPlaylist {
+                                isPlaylist = hasPlaylist
                             }
                         }
 
@@ -88,6 +89,18 @@ struct InputView: View {
                         .disabled(processingVM.isProcessing)
                     }
                     .padding(.horizontal, 4)
+
+                    if processingVM.isProcessing && !processingVM.currentPhase.isEmpty {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(processingVM.currentPhase)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 4)
+                    }
                 }
             }
             .padding(.horizontal)
@@ -226,7 +239,11 @@ struct InputView: View {
     }
 }
 
-#Preview {
-    InputView()
-        .environmentObject(ProcessingViewModel())
+#if DEBUG
+struct InputView_Previews: PreviewProvider {
+    static var previews: some View {
+        InputView()
+            .environmentObject(ProcessingViewModel())
+    }
 }
+#endif

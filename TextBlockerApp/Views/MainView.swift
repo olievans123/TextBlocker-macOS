@@ -26,10 +26,10 @@ struct MainView: View {
 
     private var missingDependencies: [String] {
         var missing: [String] = []
-        if !FileManager.default.fileExists(atPath: "/opt/homebrew/bin/ffmpeg") {
+        if !DependencyLocator.isInstalled("ffmpeg") {
             missing.append("ffmpeg")
         }
-        if !FileManager.default.fileExists(atPath: "/opt/homebrew/bin/yt-dlp") {
+        if !DependencyLocator.isInstalled("yt-dlp") {
             missing.append("yt-dlp")
         }
         return missing
@@ -187,6 +187,10 @@ struct SidebarButton: View {
     }
 }
 
-#Preview {
-    MainView()
+#if DEBUG
+struct MainView_Previews: PreviewProvider {
+    static var previews: some View {
+        MainView()
+    }
 }
+#endif

@@ -4,6 +4,17 @@ import os.log
 
 private let logger = Logger(subsystem: "com.textblocker", category: "Processing")
 
+private enum ProcessingError: LocalizedError {
+    case noFramesExtracted
+
+    var errorDescription: String? {
+        switch self {
+        case .noFramesExtracted:
+            return "No frames were extracted. Check the sample rate and input video."
+        }
+    }
+}
+
 @MainActor
 class ProcessingViewModel: ObservableObject {
 
@@ -17,6 +28,7 @@ class ProcessingViewModel: ObservableObject {
     private let vision = VisionOCRService.shared
     private let hasher = PerceptualHashService()
     private let settings = SettingsService.shared
+    private var activeDownloadToken: UUID?
 
     // MARK: - Public Interface
 
@@ -58,72 +70,168 @@ class ProcessingViewModel: ObservableObject {
     func processYouTubeVideo(url: String) async {
         isProcessing = true
         currentPhase = "Fetching video info..."
+        defer {
+            isProcessing = jobs.contains { $0.status.isProcessing }
+            if !isProcessing {
+                currentPhase = ""
+            }
+        }
 
+        var tempDir: URL?
+        var job: ProcessingJob?
         do {
-            let tempDir = FileManager.default.temporaryDirectory
+            let video = try await ytdlp.getVideoInfo(url: url)
+
+            let dir = FileManager.default.temporaryDirectory
                 .appendingPathComponent("TextBlocker_\(UUID().uuidString)")
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            tempDir = dir
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
-            currentPhase = "Downloading video..."
+            let outputURL = await ytdlp.outputURL(forTitle: video.title, id: video.id, outputDir: dir)
+            let newJob = ProcessingJob(
+                inputURL: outputURL,
+                type: .youtubeVideo,
+                sourceURL: url,
+                title: video.title
+            )
+            newJob.status = .downloading(progress: 0)
+            jobs.append(newJob)
+            job = newJob
 
-            let localURL = try await ytdlp.downloadVideo(
+            currentPhase = youtubePhaseText(
+                progress: 0,
+                stage: .downloading,
+                status: "Starting download",
+                title: video.title,
+                prefix: nil
+            )
+
+            let downloadToken = UUID()
+            activeDownloadToken = downloadToken
+            _ = try await ytdlp.downloadVideo(
                 url: url,
-                outputDir: tempDir
-            ) { [weak self] progress, status in
+                outputURL: outputURL,
+                duration: video.duration.map(Double.init)
+            ) { [weak self, weak newJob] update in
                 Task { @MainActor in
-                    self?.currentPhase = "Downloading: \(Int(progress * 100))%"
+                    guard self?.activeDownloadToken == downloadToken else { return }
+                    let progress = update.progress ?? (update.stage == .merging ? 0 : (newJob?.status.progress ?? 0))
+                    switch update.stage {
+                    case .downloading:
+                        newJob?.status = .downloading(progress: progress)
+                    case .merging:
+                        newJob?.status = .merging(progress: progress)
+                    }
+                    self?.currentPhase = self?.youtubePhaseText(
+                        progress: update.progress,
+                        stage: update.stage,
+                        status: update.message,
+                        title: video.title,
+                        prefix: nil
+                    ) ?? ""
                 }
             }
 
-            let job = ProcessingJob(inputURL: localURL, type: .youtubeVideo, sourceURL: url)
-            jobs.append(job)
-            await processJob(job)
+            activeDownloadToken = nil
+            currentPhase = "Preparing processing - \(video.title)"
+
+            await processJob(newJob)
         } catch {
+            if let tempDir, job == nil {
+                try? FileManager.default.removeItem(at: tempDir)
+            }
+            activeDownloadToken = nil
+            job?.status = .failed(error: error.localizedDescription)
             self.error = error.localizedDescription
-            isProcessing = false
         }
     }
 
     func processYouTubePlaylist(url: String) async {
         isProcessing = true
         currentPhase = "Fetching playlist..."
+        defer {
+            isProcessing = jobs.contains { $0.status.isProcessing }
+            if !isProcessing {
+                currentPhase = ""
+            }
+        }
 
+        var tempDir: URL?
         do {
             let videos = try await ytdlp.getPlaylistVideos(url: url)
-            let tempDir = FileManager.default.temporaryDirectory
+            guard !videos.isEmpty else {
+                error = "No videos found in playlist"
+                return
+            }
+            let dir = FileManager.default.temporaryDirectory
                 .appendingPathComponent("TextBlocker_\(UUID().uuidString)")
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            tempDir = dir
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
             for (index, video) in videos.enumerated() {
-                currentPhase = "Downloading video \(index + 1)/\(videos.count)..."
-
-                let localURL = try await ytdlp.downloadVideo(
-                    videoId: video.id,
-                    outputDir: tempDir
-                ) { [weak self] progress, _ in
-                    let idx = index + 1
-                    let total = videos.count
-                    Task { @MainActor in
-                        self?.currentPhase = "Downloading \(idx)/\(total): \(Int(progress * 100))%"
-                    }
-                }
-
+                let outputURL = await ytdlp.outputURL(forTitle: video.title, id: video.id, outputDir: dir)
                 let job = ProcessingJob(
-                    inputURL: localURL,
+                    inputURL: outputURL,
                     type: .youtubePlaylist,
                     sourceURL: video.id,
                     title: video.title
                 )
+                job.status = .downloading(progress: 0)
                 jobs.append(job)
-            }
 
-            // Process all downloaded videos
-            for job in jobs where job.status == .pending {
-                await processJob(job)
+                let idx = index + 1
+                let total = videos.count
+                currentPhase = youtubePhaseText(
+                    progress: 0,
+                    stage: .downloading,
+                    status: "Starting download",
+                    title: video.title,
+                    prefix: "\(idx)/\(total)"
+                )
+
+                let downloadToken = UUID()
+                activeDownloadToken = downloadToken
+                do {
+                    _ = try await ytdlp.downloadVideo(
+                        url: "https://www.youtube.com/watch?v=\(video.id)",
+                        outputURL: outputURL,
+                        duration: video.duration.map(Double.init)
+                    ) { [weak self, weak job] update in
+                        Task { @MainActor in
+                            guard self?.activeDownloadToken == downloadToken else { return }
+                            let progress = update.progress ?? (update.stage == .merging ? 0 : (job?.status.progress ?? 0))
+                            switch update.stage {
+                            case .downloading:
+                                job?.status = .downloading(progress: progress)
+                            case .merging:
+                                job?.status = .merging(progress: progress)
+                            }
+                            self?.currentPhase = self?.youtubePhaseText(
+                                progress: update.progress,
+                                stage: update.stage,
+                                status: update.message,
+                                title: video.title,
+                                prefix: "\(idx)/\(total)"
+                            ) ?? ""
+                        }
+                    }
+
+                    activeDownloadToken = nil
+                    currentPhase = "Preparing processing - \(video.title)"
+                    await processJob(job)
+                } catch {
+                    activeDownloadToken = nil
+                    job.status = .failed(error: error.localizedDescription)
+                    self.error = error.localizedDescription
+                }
             }
         } catch {
+            if let tempDir {
+                try? FileManager.default.removeItem(at: tempDir)
+                jobs.removeAll { $0.inputURL.path.hasPrefix(tempDir.path) }
+            }
+            activeDownloadToken = nil
             self.error = error.localizedDescription
-            isProcessing = false
         }
     }
 
@@ -139,10 +247,6 @@ class ProcessingViewModel: ObservableObject {
     func cancelJob(_ job: ProcessingJob) {
         job.isCancellationRequested = true
         job.status = .cancelled
-        isProcessing = jobs.contains { $0.status.isProcessing }
-        if !isProcessing {
-            currentPhase = ""
-        }
     }
 
     func removeJob(_ job: ProcessingJob) {
@@ -154,7 +258,14 @@ class ProcessingViewModel: ObservableObject {
     private func processJob(_ job: ProcessingJob) async {
         isProcessing = true
         error = nil
+        defer {
+            isProcessing = jobs.contains { $0.status.isProcessing }
+            if !isProcessing {
+                currentPhase = ""
+            }
+        }
 
+        var tempDir: URL?
         do {
             // Check for cancellation
             guard !job.isCancellationRequested else { return }
@@ -169,15 +280,16 @@ class ProcessingViewModel: ObservableObject {
             currentPhase = "Extracting frames..."
             job.status = .extracting(progress: 0)
 
-            let tempDir = FileManager.default.temporaryDirectory
+            let dir = FileManager.default.temporaryDirectory
                 .appendingPathComponent("TextBlocker_frames_\(UUID().uuidString)")
-            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            tempDir = dir
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
             let frameURLs = try await ffmpeg.extractFrames(
                 from: job.inputURL,
                 fps: settings.sampleFPS,
                 height: settings.ocrHeight,
-                outputDir: tempDir
+                outputDir: dir
             ) { [weak self, weak job] progress in
                 Task { @MainActor in
                     self?.currentPhase = "Extracting frames: \(Int(progress * 100))%"
@@ -186,6 +298,9 @@ class ProcessingViewModel: ObservableObject {
             }
 
             logger.info("Extracted \(frameURLs.count) frames")
+            guard !frameURLs.isEmpty else {
+                throw ProcessingError.noFramesExtracted
+            }
 
             // Phase 3: OCR detection with frame skipping
             currentPhase = "Detecting text..."
@@ -198,12 +313,13 @@ class ProcessingViewModel: ObservableObject {
             let frameDuration = 1.0 / settings.sampleFPS
             let forceIntervalFrames = Int(settings.forceInterval * settings.sampleFPS)
 
+            let totalFrames = frameURLs.count
             for (index, frameURL) in frameURLs.enumerated() {
                 // Check for cancellation during detection loop
                 if job.isCancellationRequested { break }
 
                 let timestamp = Double(index) * frameDuration
-                let progress = Double(index) / Double(frameURLs.count)
+                let progress = Double(index + 1) / Double(totalFrames)
                 currentPhase = "Detecting text: \(Int(progress * 100))%"
                 job.status = .detecting(progress: progress)
 
@@ -281,7 +397,9 @@ class ProcessingViewModel: ObservableObject {
 
             // Check for cancellation before encoding (most expensive phase)
             guard !job.isCancellationRequested else {
-                try? FileManager.default.removeItem(at: tempDir)
+                if let tempDir {
+                    try? FileManager.default.removeItem(at: tempDir)
+                }
                 return
             }
 
@@ -318,6 +436,15 @@ class ProcessingViewModel: ObservableObject {
                 }
             }
 
+            if job.isCancellationRequested {
+                job.status = .cancelled
+                try? FileManager.default.removeItem(at: outputURL)
+                if let tempDir {
+                    try? FileManager.default.removeItem(at: tempDir)
+                }
+                return
+            }
+
             job.outputURL = outputURL
             job.status = .completed
 
@@ -325,7 +452,9 @@ class ProcessingViewModel: ObservableObject {
             self.error = nil
 
             // Cleanup temp files
-            try? FileManager.default.removeItem(at: tempDir)
+            if let tempDir {
+                try? FileManager.default.removeItem(at: tempDir)
+            }
 
             logger.info("Processing complete: \(outputURL.path)")
 
@@ -333,11 +462,9 @@ class ProcessingViewModel: ObservableObject {
             job.status = .failed(error: error.localizedDescription)
             self.error = error.localizedDescription
             logger.error("Processing failed: \(error.localizedDescription)")
-        }
-
-        isProcessing = jobs.contains { $0.status.isProcessing }
-        if !isProcessing {
-            currentPhase = ""
+            if let tempDir {
+                try? FileManager.default.removeItem(at: tempDir)
+            }
         }
     }
 
@@ -449,5 +576,34 @@ class ProcessingViewModel: ObservableObject {
         let directory = inputURL.deletingLastPathComponent()
         let baseName = inputURL.deletingPathExtension().lastPathComponent
         return directory.appendingPathComponent("\(baseName)_blocked.mp4")
+    }
+
+    private func youtubePhaseText(
+        progress: Double?,
+        stage: YTDLPProgressStage,
+        status: String,
+        title: String,
+        prefix: String?
+    ) -> String {
+        let titleSuffix = title.isEmpty ? "" : " - \(title)"
+        let prefixText = prefix.map { "\($0) " } ?? ""
+
+        switch stage {
+        case .merging:
+            if let progress, progress > 0 {
+                return "\(prefixText)Merging: \(Int(progress * 100))%\(titleSuffix)"
+            }
+            return "\(prefixText)Merging audio + video\(titleSuffix)"
+        case .downloading:
+            let lower = status.lowercased()
+            if lower.contains("destination") {
+                return "\(prefixText)Starting download\(titleSuffix)"
+            }
+            let value = progress ?? 0
+            if value >= 0.999 {
+                return "\(prefixText)Download complete\(titleSuffix)"
+            }
+            return "\(prefixText)Downloading: \(Int(value * 100))%\(titleSuffix)"
+        }
     }
 }

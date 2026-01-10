@@ -116,8 +116,8 @@ struct SettingsView: View {
 
             // Dependencies Section
             Section("Dependencies") {
-                dependencyRow(name: "ffmpeg", path: "/opt/homebrew/bin/ffmpeg")
-                dependencyRow(name: "yt-dlp", path: "/opt/homebrew/bin/yt-dlp")
+                dependencyRow(name: "ffmpeg")
+                dependencyRow(name: "yt-dlp")
 
                 Text("Install with: brew install ffmpeg yt-dlp")
                     .font(.caption)
@@ -165,8 +165,8 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func dependencyRow(name: String, path: String) -> some View {
-        let exists = FileManager.default.fileExists(atPath: path)
+    private func dependencyRow(name: String) -> some View {
+        let exists = DependencyLocator.isInstalled(name)
 
         HStack {
             Image(systemName: exists ? "checkmark.circle.fill" : "xmark.circle.fill")
@@ -183,6 +183,10 @@ struct SettingsView: View {
     }
 }
 
-#Preview {
-    SettingsView()
+#if DEBUG
+struct SettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        SettingsView()
+    }
 }
+#endif

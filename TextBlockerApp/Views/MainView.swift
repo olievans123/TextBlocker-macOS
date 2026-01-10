@@ -19,23 +19,29 @@ enum NavigationItem: String, CaseIterable, Identifiable {
 }
 
 struct MainView: View {
-    @State private var selectedItem: NavigationItem = .files
+    @State private var selectedItem: NavigationItem? = .files
     @StateObject private var processingVM = ProcessingViewModel()
 
     var body: some View {
         NavigationSplitView {
-            List(NavigationItem.allCases, selection: $selectedItem) { item in
-                NavigationLink(value: item) {
+            List(selection: $selectedItem) {
+                ForEach(NavigationItem.allCases) { item in
                     Label(item.rawValue, systemImage: item.icon)
+                        .tag(item)
+                        .badge(badgeCount(for: item))
                 }
-                .badge(badgeCount(for: item))
             }
             .listStyle(.sidebar)
             .frame(minWidth: 180)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
-            contentView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let selected = selectedItem {
+                contentView(for: selected)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                DropZoneView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .environmentObject(processingVM)
         .toolbar {
@@ -54,8 +60,8 @@ struct MainView: View {
     }
 
     @ViewBuilder
-    private var contentView: some View {
-        switch selectedItem {
+    private func contentView(for item: NavigationItem) -> some View {
+        switch item {
         case .files:
             DropZoneView()
         case .youtube:

@@ -30,12 +30,31 @@ struct MainView: View {
                     SidebarButton(
                         item: item,
                         isSelected: selectedItem == item,
-                        badge: badgeCount(for: item)
+                        badge: badgeCount(for: item),
+                        isActive: item == .queue && processingVM.isProcessing
                     ) {
                         selectedItem = item
                     }
                 }
+
                 Spacer()
+
+                // Status indicator at bottom of sidebar
+                if processingVM.isProcessing {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Divider()
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                            Text(processingVM.currentPhase)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                    }
+                }
             }
             .padding(8)
             .frame(minWidth: 160, maxWidth: 200)
@@ -46,7 +65,19 @@ struct MainView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .environmentObject(processingVM)
-        .frame(minWidth: 700, minHeight: 500)
+        .frame(minWidth: 800, minHeight: 500)
+        // Auto-navigate to Queue when processing starts
+        .onChange(of: processingVM.isProcessing) { _, isProcessing in
+            if isProcessing && selectedItem == .files {
+                withAnimation {
+                    selectedItem = .queue
+                }
+            }
+        }
+        // Show notification when job completes
+        .onChange(of: processingVM.jobs.map { $0.status }) { _, _ in
+            checkForCompletedJobs()
+        }
     }
 
     @ViewBuilder
@@ -71,22 +102,37 @@ struct MainView: View {
             return 0
         }
     }
+
+    private func checkForCompletedJobs() {
+        // Could add notification sound or system notification here
+    }
 }
 
 struct SidebarButton: View {
     let item: NavigationItem
     let isSelected: Bool
     let badge: Int
+    var isActive: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack {
                 Label(item.rawValue, systemImage: item.icon)
+                    .foregroundColor(isSelected ? .accentColor : .primary)
+
                 Spacer()
+
+                if isActive {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                }
+
                 if badge > 0 {
                     Text("\(badge)")
                         .font(.caption2)
+                        .fontWeight(.medium)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.accentColor)
@@ -97,7 +143,7 @@ struct SidebarButton: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+            .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
             .cornerRadius(6)
         }
         .buttonStyle(.plain)

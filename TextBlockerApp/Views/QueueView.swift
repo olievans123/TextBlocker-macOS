@@ -7,18 +7,28 @@ struct QueueView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Processing Queue")
-                    .font(.title2)
-                    .fontWeight(.bold)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Processing Queue")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    if processingVM.isProcessing {
+                        Text(processingVM.currentPhase)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
 
                 Spacer()
 
                 if !processingVM.jobs.isEmpty {
                     Button("Clear Completed") {
-                        processingVM.clearCompleted()
+                        withAnimation {
+                            processingVM.clearCompleted()
+                        }
                     }
                     .buttonStyle(.bordered)
-                    .disabled(processingVM.jobs.allSatisfy { $0.status.isProcessing || $0.status == .pending })
+                    .disabled(!hasCompletedJobs)
                 }
             }
             .padding()
@@ -33,104 +43,156 @@ struct QueueView: View {
         }
     }
 
+    private var hasCompletedJobs: Bool {
+        processingVM.jobs.contains { job in
+            if case .completed = job.status { return true }
+            if case .failed = job.status { return true }
+            return false
+        }
+    }
+
     private var emptyState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Image(systemName: "tray")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
+                .font(.system(size: 56))
+                .foregroundColor(.secondary.opacity(0.5))
 
-            Text("No jobs in queue")
-                .font(.headline)
-                .foregroundColor(.secondary)
+            VStack(spacing: 8) {
+                Text("No jobs in queue")
+                    .font(.title3)
+                    .fontWeight(.medium)
 
-            Text("Drop files or enter a YouTube URL to get started")
-                .font(.subheadline)
-                .foregroundColor(.secondary.opacity(0.8))
+                Text("Drop files on the Files tab or\nenter a YouTube URL to get started")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var jobsList: some View {
-        List {
-            ForEach(processingVM.jobs) { job in
-                JobRowView(job: job)
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(processingVM.jobs) { job in
+                    JobCardView(job: job)
+                }
             }
+            .padding()
         }
-        .listStyle(.inset)
     }
 }
 
-struct JobRowView: View {
+struct JobCardView: View {
     @ObservedObject var job: ProcessingJob
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Status icon
-            statusIcon
-                .frame(width: 32, height: 32)
+        VStack(alignment: .leading, spacing: 12) {
+            // Header row
+            HStack(spacing: 12) {
+                statusIcon
+                    .frame(width: 36, height: 36)
+                    .background(statusColor.opacity(0.15))
+                    .cornerRadius(8)
 
-            // Info
-            VStack(alignment: .leading, spacing: 4) {
-                Text(job.title)
-                    .font(.headline)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(job.title)
+                        .font(.headline)
+                        .lineLimit(1)
 
-                Text(job.status.displayText)
-                    .font(.caption)
-                    .foregroundColor(statusColor)
+                    HStack(spacing: 8) {
+                        Text(job.status.displayText)
+                            .font(.caption)
+                            .foregroundColor(statusColor)
 
-                if job.status.isProcessing {
+                        if job.detectedRegions > 0 {
+                            Text("\(job.detectedRegions) regions")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                // Action buttons
+                actionButtons
+            }
+
+            // Progress bar for active jobs
+            if job.status.isProcessing {
+                VStack(alignment: .leading, spacing: 4) {
                     ProgressView(value: job.status.progress)
                         .progressViewStyle(.linear)
+
+                    Text("\(Int(job.status.progress * 100))%")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
             }
 
-            Spacer()
-
-            // Actions
+            // Success message with output path
             if case .completed = job.status, let outputURL = job.outputURL {
-                Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([outputURL])
-                } label: {
-                    Image(systemName: "folder")
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+
+                    Text("Saved to: \(outputURL.lastPathComponent)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+
+                    Spacer()
                 }
-                .buttonStyle(.bordered)
-                .help("Show in Finder")
+                .padding(8)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(6)
             }
 
-            if case .failed = job.status {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
+            // Error message
+            if case .failed(let error) = job.status {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+                .padding(8)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(6)
             }
         }
-        .padding(.vertical, 8)
+        .padding()
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
     }
 
     @ViewBuilder
     private var statusIcon: some View {
-        switch job.status {
-        case .pending:
-            Image(systemName: "clock")
-                .foregroundColor(.secondary)
-        case .downloading:
-            Image(systemName: "arrow.down.circle")
-                .foregroundColor(.blue)
-        case .extracting:
-            Image(systemName: "film")
-                .foregroundColor(.purple)
-        case .detecting:
-            Image(systemName: "text.viewfinder")
-                .foregroundColor(.orange)
-        case .encoding:
-            Image(systemName: "gearshape.2")
-                .foregroundColor(.green)
-        case .completed:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
-        case .failed:
-            Image(systemName: "xmark.circle.fill")
-                .foregroundColor(.red)
+        Group {
+            switch job.status {
+            case .pending:
+                Image(systemName: "clock")
+            case .downloading:
+                Image(systemName: "arrow.down.circle")
+            case .extracting:
+                Image(systemName: "film")
+            case .detecting:
+                Image(systemName: "text.viewfinder")
+            case .encoding:
+                Image(systemName: "gearshape.2")
+            case .completed:
+                Image(systemName: "checkmark.circle.fill")
+            case .failed:
+                Image(systemName: "xmark.circle.fill")
+            }
         }
+        .font(.system(size: 18))
+        .foregroundColor(statusColor)
     }
 
     private var statusColor: Color {
@@ -139,9 +201,32 @@ struct JobRowView: View {
         case .downloading: return .blue
         case .extracting: return .purple
         case .detecting: return .orange
-        case .encoding: return .green
+        case .encoding: return .cyan
         case .completed: return .green
         case .failed: return .red
+        }
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        HStack(spacing: 8) {
+            if case .completed = job.status, let outputURL = job.outputURL {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([outputURL])
+                } label: {
+                    Label("Show", systemImage: "folder")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button {
+                    NSWorkspace.shared.open(outputURL)
+                } label: {
+                    Label("Play", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
         }
     }
 }

@@ -233,6 +233,9 @@ actor FFmpegService {
                 process.standardOutput = pipe
                 process.standardError = errorPipe
 
+                // Track max progress to prevent going backwards
+                var maxProgress: Double = 0
+
                 // Parse progress output
                 pipe.fileHandleForReading.readabilityHandler = { handle in
                     let data = handle.availableData
@@ -243,20 +246,26 @@ actor FFmpegService {
                     for line in text.components(separatedBy: "\n") {
                         if line.hasPrefix("out_time_us=") {
                             let value = line.replacingOccurrences(of: "out_time_us=", with: "")
-                            if let us = Double(value) {
+                            if let us = Double(value), us > 0 {
                                 let seconds = us / 1_000_000
                                 let progress = min(max(seconds / totalDuration, 0), 1.0)
-                                DispatchQueue.main.async {
-                                    progressHandler(progress)
+                                if progress > maxProgress {
+                                    maxProgress = progress
+                                    DispatchQueue.main.async {
+                                        progressHandler(progress)
+                                    }
                                 }
                             }
                         } else if line.hasPrefix("out_time_ms=") {
                             let value = line.replacingOccurrences(of: "out_time_ms=", with: "")
-                            if let ms = Double(value) {
+                            if let ms = Double(value), ms > 0 {
                                 let seconds = ms / 1_000
                                 let progress = min(max(seconds / totalDuration, 0), 1.0)
-                                DispatchQueue.main.async {
-                                    progressHandler(progress)
+                                if progress > maxProgress {
+                                    maxProgress = progress
+                                    DispatchQueue.main.async {
+                                        progressHandler(progress)
+                                    }
                                 }
                             }
                         }

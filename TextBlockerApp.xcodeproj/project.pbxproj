@@ -9,8 +9,6 @@
 /* Begin PBXBuildFile section */
 		APP001 /* TextBlockerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC001; };
 		APP002 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC002; };
-		APP003 /* DropZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC003; };
-		APP004 /* YouTubeInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC004; };
 		APP005 /* QueueView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC005; };
 		APP006 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC006; };
 		APP007 /* ProcessingJob.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC007; };
@@ -30,8 +28,6 @@
 		PRD001 /* TextBlockerApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TextBlockerApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		SRC001 /* TextBlockerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextBlockerApp.swift; sourceTree = "<group>"; };
 		SRC002 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
-		SRC003 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
-		SRC004 /* YouTubeInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeInputView.swift; sourceTree = "<group>"; };
 		SRC005 /* QueueView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueView.swift; sourceTree = "<group>"; };
 		SRC006 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		SRC007 /* ProcessingJob.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingJob.swift; sourceTree = "<group>"; };
@@ -123,8 +119,6 @@
 			isa = PBXGroup;
 			children = (
 				SRC002 /* MainView.swift */,
-				SRC003 /* DropZoneView.swift */,
-				SRC004 /* YouTubeInputView.swift */,
 				SRC005 /* QueueView.swift */,
 				SRC006 /* SettingsView.swift */,
 				SRC017 /* InputView.swift */,
@@ -211,8 +205,6 @@
 			files = (
 				APP001 /* TextBlockerApp.swift in Sources */,
 				APP002 /* MainView.swift in Sources */,
-				APP003 /* DropZoneView.swift in Sources */,
-				APP004 /* YouTubeInputView.swift in Sources */,
 				APP005 /* QueueView.swift in Sources */,
 				APP006 /* SettingsView.swift in Sources */,
 				APP007 /* ProcessingJob.swift in Sources */,

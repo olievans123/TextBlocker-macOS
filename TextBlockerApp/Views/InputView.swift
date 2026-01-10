@@ -34,7 +34,18 @@ struct InputView: View {
                             }
                         }
 
-                    if !urlText.isEmpty {
+                    if urlText.isEmpty {
+                        Button {
+                            if let clipboardString = NSPasteboard.general.string(forType: .string) {
+                                urlText = clipboardString
+                            }
+                        } label: {
+                            Image(systemName: "doc.on.clipboard")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Paste from clipboard")
+                    } else {
                         Button {
                             urlText = ""
                         } label: {
@@ -42,6 +53,7 @@ struct InputView: View {
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
+                        .help("Clear")
                     }
                 }
                 .padding(12)

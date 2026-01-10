@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 enum NavigationItem: String, CaseIterable, Identifiable {
     case input = "Add Video"
@@ -21,6 +22,7 @@ struct MainView: View {
     @StateObject private var processingVM = ProcessingViewModel()
     @State private var showDependencyAlert = false
     @AppStorage("hasShownOnboarding") private var hasShownOnboarding = false
+    @State private var previousCompletedCount = 0
 
     private var missingDependencies: [String] {
         var missing: [String] = []
@@ -128,7 +130,17 @@ struct MainView: View {
     }
 
     private func checkForCompletedJobs() {
-        // Could add notification sound or system notification here
+        let completedCount = processingVM.jobs.filter {
+            if case .completed = $0.status { return true }
+            return false
+        }.count
+
+        // Play sound when a new job completes
+        if completedCount > previousCompletedCount {
+            NSSound.beep()  // System sound
+            // Or use: NSSound(named: "Glass")?.play()
+        }
+        previousCompletedCount = completedCount
     }
 }
 

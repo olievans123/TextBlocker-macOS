@@ -317,6 +317,9 @@ class ProcessingViewModel: ObservableObject {
             job.outputURL = outputURL
             job.status = .completed
 
+            // Clear any previous error on success
+            self.error = nil
+
             // Cleanup temp files
             try? FileManager.default.removeItem(at: tempDir)
 

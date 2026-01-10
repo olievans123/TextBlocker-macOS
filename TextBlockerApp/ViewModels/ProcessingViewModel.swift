@@ -319,17 +319,22 @@ class ProcessingViewModel: ObservableObject {
     ) -> [TextRegion] {
         var regions: [TextRegion] = []
 
+        // Maximum gap allowed to extend a region (2 seconds)
+        let maxGap = 2.0
+
         for detection in detections {
             // Merge overlapping boxes within this frame
             let mergedBoxes = mergeBoxes(detection.boxes, padding: mergePad)
 
             for box in mergedBoxes {
                 // Try to extend an existing region with similar box
+                // BUT only if the detection is close in time (no big gaps)
                 if let existingIndex = regions.firstIndex(where: { region in
-                    boxesSimilar(region.box, box, tolerance: mergePad)
+                    boxesSimilar(region.box, box, tolerance: mergePad) &&
+                    (detection.timestamp - region.endTime) <= maxGap
                 }) {
                     // Extend the time range
-                    regions[existingIndex].endTime = detection.timestamp
+                    regions[existingIndex].endTime = detection.timestamp + frameDuration
                 } else {
                     // Create new region
                     regions.append(TextRegion(

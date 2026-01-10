@@ -207,6 +207,13 @@ class ProcessingViewModel: ObservableObject {
                         languages: settings.languages
                     )
 
+                    if index < 5 {
+                        logger.info("Frame \(index): detected \(normalizedBoxes.count) text regions")
+                        for (j, box) in normalizedBoxes.prefix(3).enumerated() {
+                            logger.info("  Box \(j): x=\(box.origin.x), y=\(box.origin.y), w=\(box.width), h=\(box.height)")
+                        }
+                    }
+
                     // Denormalize to pixel coordinates
                     boxes = await vision.denormalizeBoxes(
                         normalizedBoxes,
@@ -244,20 +251,27 @@ class ProcessingViewModel: ObservableObject {
             job.detectedRegions = regions.count
             logger.info("Created \(regions.count) text regions")
 
+            // Debug: log first few regions
+            for (i, region) in regions.prefix(3).enumerated() {
+                logger.info("Region \(i): x=\(Int(region.box.origin.x)), y=\(Int(region.box.origin.y)), w=\(Int(region.box.width)), h=\(Int(region.box.height)), time=\(region.startTime)-\(region.endTime)")
+            }
+
             // Phase 5: Generate filter and encode
             currentPhase = "Encoding video..."
             job.status = .encoding(progress: 0)
 
-            // Generate ffmpeg filter string
-            let scale = Double(videoInfo.height) / Double(settings.ocrHeight)
+            // Boxes are already in original video coordinates (from denormalizeBoxes)
+            // so scale = 1.0
             var filterSpec = regions.map { region in
-                region.toFFmpegFilter(padding: settings.padding, scale: scale)
+                region.toFFmpegFilter(padding: settings.padding, scale: 1.0)
             }.joined(separator: ",")
+
+            logger.info("Filter spec (first 500 chars): \(String(filterSpec.prefix(500)))")
 
             // Check filter complexity
             if regions.count > self.settings.maxFilters {
                 logger.warning("Filter count \(regions.count) exceeds max \(self.settings.maxFilters), collapsing...")
-                filterSpec = collapseFilters(regions: regions, padding: self.settings.padding, scale: scale)
+                filterSpec = collapseFilters(regions: regions, padding: self.settings.padding, scale: 1.0)
             }
 
             // Generate output path

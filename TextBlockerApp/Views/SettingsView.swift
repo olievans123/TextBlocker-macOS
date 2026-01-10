@@ -37,13 +37,19 @@ struct SettingsView: View {
 
             // OCR Section
             Section("Text Detection") {
+                Toggle("Accurate Mode", isOn: $settings.useAccurateMode)
+                Text("Better detection but slower processing")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
                 HStack {
                     Text("OCR Resolution")
                     Spacer()
                     Picker("", selection: $settings.ocrHeight) {
-                        Text("240p (Fast)").tag(240)
-                        Text("360p (Balanced)").tag(360)
-                        Text("480p (Accurate)").tag(480)
+                        Text("360p (Fast)").tag(360)
+                        Text("480p (Balanced)").tag(480)
+                        Text("720p (Accurate)").tag(720)
+                        Text("1080p (Best)").tag(1080)
                     }
                     .frame(width: 160)
                 }
@@ -55,6 +61,7 @@ struct SettingsView: View {
                         Text("0.5 fps (Fast)").tag(0.5)
                         Text("1.0 fps (Balanced)").tag(1.0)
                         Text("2.0 fps (Accurate)").tag(2.0)
+                        Text("4.0 fps (Best)").tag(4.0)
                     }
                     .frame(width: 160)
                 }

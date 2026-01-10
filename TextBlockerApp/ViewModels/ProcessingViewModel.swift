@@ -204,7 +204,8 @@ class ProcessingViewModel: ObservableObject {
                     // Run Vision OCR
                     let normalizedBoxes = try await vision.detectTextRegions(
                         in: frameURL,
-                        languages: settings.languages
+                        languages: settings.languages,
+                        useAccurateMode: settings.useAccurateMode
                     )
 
                     if index < 5 {

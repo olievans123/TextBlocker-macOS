@@ -49,6 +49,7 @@ class SettingsService: ObservableObject {
     private let maxFiltersKey = "maxFilters"
     private let skipSimilarKey = "skipSimilar"
     private let selectedPresetKey = "selectedPreset"
+    private let useAccurateModeKey = "useAccurateMode"
 
     @Published var ocrHeight: Int {
         didSet { defaults.set(ocrHeight, forKey: ocrHeightKey) }
@@ -90,6 +91,10 @@ class SettingsService: ObservableObject {
         didSet { defaults.set(skipSimilar, forKey: skipSimilarKey) }
     }
 
+    @Published var useAccurateMode: Bool {
+        didSet { defaults.set(useAccurateMode, forKey: useAccurateModeKey) }
+    }
+
     @Published var selectedPresetName: String {
         didSet { defaults.set(selectedPresetName, forKey: selectedPresetKey) }
     }
@@ -103,6 +108,7 @@ class SettingsService: ObservableObject {
         self.forceInterval = defaults.object(forKey: forceIntervalKey) as? Double ?? 2.0
         self.maxFilters = defaults.object(forKey: maxFiltersKey) as? Int ?? 1200
         self.skipSimilar = defaults.object(forKey: skipSimilarKey) as? Bool ?? true
+        self.useAccurateMode = defaults.object(forKey: useAccurateModeKey) as? Bool ?? true  // Default to accurate
         self.selectedPresetName = defaults.string(forKey: selectedPresetKey) ?? "Default"
 
         let qualityRaw = defaults.string(forKey: qualityKey) ?? VideoQuality.balanced.rawValue
@@ -124,14 +130,15 @@ class SettingsService: ObservableObject {
     }
 
     func resetToDefaults() {
-        ocrHeight = 480
-        sampleFPS = 1.0
+        ocrHeight = 720
+        sampleFPS = 2.0
         padding = 14
         mergePad = 6
         sceneThreshold = 8
         forceInterval = 2.0
         maxFilters = 1200
         skipSimilar = true
+        useAccurateMode = true
         quality = .balanced
         languages = ["en", "fr", "de", "es", "it", "pt", "nl"]
         selectedPresetName = "Default"

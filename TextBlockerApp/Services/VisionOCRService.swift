@@ -23,7 +23,9 @@ actor VisionOCRService {
     /// Returns boxes in normalized coordinates (0-1), origin at bottom-left
     func detectTextRegions(
         in cgImage: CGImage,
-        languages: [String] = ["en"]
+        languages: [String] = ["en"],
+        useAccurateMode: Bool = true,
+        minimumTextHeight: Float = 0.0
     ) async throws -> [CGRect] {
         try await withCheckedThrowingContinuation { continuation in
             let request = VNRecognizeTextRequest { request, error in
@@ -42,13 +44,21 @@ actor VisionOCRService {
                     observation.boundingBox
                 }
 
+                logger.info("Vision detected \(boxes.count) text regions")
+
                 continuation.resume(returning: boxes)
             }
 
-            // Configure for speed over accuracy - we only need boxes
-            request.recognitionLevel = .fast
+            // Use accurate mode for better detection (slower but finds more text)
+            request.recognitionLevel = useAccurateMode ? .accurate : .fast
             request.recognitionLanguages = languages
             request.usesLanguageCorrection = false
+            request.automaticallyDetectsLanguage = true  // Auto-detect languages not in list
+
+            // Set minimum text height if specified (0-1 normalized)
+            if minimumTextHeight > 0 {
+                request.minimumTextHeight = minimumTextHeight
+            }
 
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
             do {
@@ -62,14 +72,21 @@ actor VisionOCRService {
     /// Detect text in image file
     func detectTextRegions(
         in imageURL: URL,
-        languages: [String] = ["en"]
+        languages: [String] = ["en"],
+        useAccurateMode: Bool = true,
+        minimumTextHeight: Float = 0.0
     ) async throws -> [CGRect] {
         guard let image = NSImage(contentsOf: imageURL),
               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw VisionError.imageLoadFailed
         }
 
-        return try await detectTextRegions(in: cgImage, languages: languages)
+        return try await detectTextRegions(
+            in: cgImage,
+            languages: languages,
+            useAccurateMode: useAccurateMode,
+            minimumTextHeight: minimumTextHeight
+        )
     }
 
     /// Convert normalized Vision coordinates to pixel coordinates

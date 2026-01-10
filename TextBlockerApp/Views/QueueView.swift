@@ -84,6 +84,7 @@ struct QueueView: View {
 }
 
 struct JobCardView: View {
+    @EnvironmentObject var processingVM: ProcessingViewModel
     @ObservedObject var job: ProcessingJob
 
     var body: some View {
@@ -99,6 +100,12 @@ struct JobCardView: View {
                     Text(job.title)
                         .font(.headline)
                         .lineLimit(1)
+
+                    Text(job.inputURL.path)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
 
                     HStack(spacing: 8) {
                         Text(job.status.displayText)
@@ -197,6 +204,8 @@ struct JobCardView: View {
                 Image(systemName: "gearshape.2")
             case .completed:
                 Image(systemName: "checkmark.circle.fill")
+            case .cancelled:
+                Image(systemName: "stop.circle.fill")
             case .failed:
                 Image(systemName: "xmark.circle.fill")
             }
@@ -213,6 +222,7 @@ struct JobCardView: View {
         case .detecting: return .orange
         case .encoding: return .cyan
         case .completed: return .green
+        case .cancelled: return .gray
         case .failed: return .red
         }
     }
@@ -220,6 +230,19 @@ struct JobCardView: View {
     @ViewBuilder
     private var actionButtons: some View {
         HStack(spacing: 8) {
+            // Cancel button for active jobs
+            if job.status.isProcessing {
+                Button {
+                    processingVM.cancelJob(job)
+                } label: {
+                    Label("Cancel", systemImage: "xmark")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.red)
+            }
+
+            // Show/Play buttons for completed jobs
             if case .completed = job.status, let outputURL = job.outputURL {
                 Button {
                     NSWorkspace.shared.activateFileViewerSelecting([outputURL])

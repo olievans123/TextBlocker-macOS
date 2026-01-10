@@ -131,7 +131,17 @@ class ProcessingViewModel: ObservableObject {
         jobs.removeAll { job in
             if case .completed = job.status { return true }
             if case .failed = job.status { return true }
+            if case .cancelled = job.status { return true }
             return false
+        }
+    }
+
+    func cancelJob(_ job: ProcessingJob) {
+        job.isCancellationRequested = true
+        job.status = .cancelled
+        isProcessing = jobs.contains { $0.status.isProcessing }
+        if !isProcessing {
+            currentPhase = ""
         }
     }
 
@@ -142,9 +152,14 @@ class ProcessingViewModel: ObservableObject {
         error = nil
 
         do {
+            // Check for cancellation
+            guard !job.isCancellationRequested else { return }
+
             // Phase 1: Get video info
             let videoInfo = try await ffmpeg.getVideoInfo(job.inputURL)
             logger.info("Processing: \(videoInfo.width)x\(videoInfo.height), \(videoInfo.duration)s")
+
+            guard !job.isCancellationRequested else { return }
 
             // Phase 2: Extract frames
             currentPhase = "Extracting frames..."
@@ -180,6 +195,9 @@ class ProcessingViewModel: ObservableObject {
             let forceIntervalFrames = Int(settings.forceInterval * settings.sampleFPS)
 
             for (index, frameURL) in frameURLs.enumerated() {
+                // Check for cancellation during detection loop
+                if job.isCancellationRequested { break }
+
                 let timestamp = Double(index) * frameDuration
                 let progress = Double(index) / Double(frameURLs.count)
                 currentPhase = "Detecting text: \(Int(progress * 100))%"
@@ -255,6 +273,12 @@ class ProcessingViewModel: ObservableObject {
             // Debug: log first few regions
             for (i, region) in regions.prefix(3).enumerated() {
                 logger.info("Region \(i): x=\(Int(region.box.origin.x)), y=\(Int(region.box.origin.y)), w=\(Int(region.box.width)), h=\(Int(region.box.height)), time=\(region.startTime)-\(region.endTime)")
+            }
+
+            // Check for cancellation before encoding (most expensive phase)
+            guard !job.isCancellationRequested else {
+                try? FileManager.default.removeItem(at: tempDir)
+                return
             }
 
             // Phase 5: Generate filter and encode

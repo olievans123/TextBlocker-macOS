@@ -23,6 +23,7 @@
 		APP014 /* YTDLPService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC014; };
 		APP015 /* ProcessingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC015; };
 		APP016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = RES001; };
+		APP017 /* InputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SRC017; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		SRC013 /* PerceptualHashService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerceptualHashService.swift; sourceTree = "<group>"; };
 		SRC014 /* YTDLPService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YTDLPService.swift; sourceTree = "<group>"; };
 		SRC015 /* ProcessingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingViewModel.swift; sourceTree = "<group>"; };
+		SRC017 /* InputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputView.swift; sourceTree = "<group>"; };
 		RES001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		ENT001 /* TextBlocker.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TextBlocker.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -125,6 +127,7 @@
 				SRC004 /* YouTubeInputView.swift */,
 				SRC005 /* QueueView.swift */,
 				SRC006 /* SettingsView.swift */,
+				SRC017 /* InputView.swift */,
 				GRP008 /* Components */,
 			);
 			path = Views;
@@ -221,6 +224,7 @@
 				APP013 /* PerceptualHashService.swift in Sources */,
 				APP014 /* YTDLPService.swift in Sources */,
 				APP015 /* ProcessingViewModel.swift in Sources */,
+				APP017 /* InputView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

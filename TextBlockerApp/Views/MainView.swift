@@ -1,8 +1,7 @@
 import SwiftUI
 
 enum NavigationItem: String, CaseIterable, Identifiable {
-    case files = "Files"
-    case youtube = "YouTube"
+    case input = "Add Video"
     case queue = "Queue"
     case settings = "Settings"
 
@@ -10,8 +9,7 @@ enum NavigationItem: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .files: return "doc.fill"
-        case .youtube: return "play.rectangle.fill"
+        case .input: return "plus.rectangle.fill"
         case .queue: return "list.bullet.rectangle.fill"
         case .settings: return "gearshape"
         }
@@ -19,8 +17,21 @@ enum NavigationItem: String, CaseIterable, Identifiable {
 }
 
 struct MainView: View {
-    @State private var selectedItem: NavigationItem = .files
+    @State private var selectedItem: NavigationItem = .input
     @StateObject private var processingVM = ProcessingViewModel()
+    @State private var showDependencyAlert = false
+    @AppStorage("hasShownOnboarding") private var hasShownOnboarding = false
+
+    private var missingDependencies: [String] {
+        var missing: [String] = []
+        if !FileManager.default.fileExists(atPath: "/opt/homebrew/bin/ffmpeg") {
+            missing.append("ffmpeg")
+        }
+        if !FileManager.default.fileExists(atPath: "/opt/homebrew/bin/yt-dlp") {
+            missing.append("yt-dlp")
+        }
+        return missing
+    }
 
     var body: some View {
         HSplitView {
@@ -68,7 +79,7 @@ struct MainView: View {
         .frame(minWidth: 800, minHeight: 500)
         // Auto-navigate to Queue when processing starts
         .onChange(of: processingVM.isProcessing) { _, isProcessing in
-            if isProcessing && selectedItem == .files {
+            if isProcessing && selectedItem == .input {
                 withAnimation {
                     selectedItem = .queue
                 }
@@ -78,15 +89,28 @@ struct MainView: View {
         .onChange(of: processingVM.jobs.map { $0.status }) { _, _ in
             checkForCompletedJobs()
         }
+        // Check dependencies on first launch
+        .onAppear {
+            if !hasShownOnboarding && !missingDependencies.isEmpty {
+                showDependencyAlert = true
+                hasShownOnboarding = true
+            }
+        }
+        .alert("Missing Dependencies", isPresented: $showDependencyAlert) {
+            Button("Open Settings") {
+                selectedItem = .settings
+            }
+            Button("Later", role: .cancel) { }
+        } message: {
+            Text("TextBlocker requires \(missingDependencies.joined(separator: " and ")) to work.\n\nInstall with: brew install \(missingDependencies.joined(separator: " "))")
+        }
     }
 
     @ViewBuilder
     private var contentView: some View {
         switch selectedItem {
-        case .files:
-            DropZoneView()
-        case .youtube:
-            YouTubeInputView()
+        case .input:
+            InputView()
         case .queue:
             QueueView()
         case .settings:

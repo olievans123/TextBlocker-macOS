@@ -13,11 +13,12 @@ enum JobStatus: Equatable {
     case detecting(progress: Double)
     case encoding(progress: Double)
     case completed
+    case cancelled
     case failed(error: String)
 
     var isProcessing: Bool {
         switch self {
-        case .pending, .completed, .failed:
+        case .pending, .completed, .cancelled, .failed:
             return false
         default:
             return true
@@ -38,6 +39,8 @@ enum JobStatus: Equatable {
             return "Encoding \(Int(progress * 100))%"
         case .completed:
             return "Completed"
+        case .cancelled:
+            return "Cancelled"
         case .failed(let error):
             return "Failed: \(error)"
         }
@@ -45,14 +48,12 @@ enum JobStatus: Equatable {
 
     var progress: Double {
         switch self {
-        case .pending:
+        case .pending, .cancelled, .failed:
             return 0
         case .downloading(let p), .extracting(let p), .detecting(let p), .encoding(let p):
             return p
         case .completed:
             return 1
-        case .failed:
-            return 0
         }
     }
 
@@ -60,7 +61,7 @@ enum JobStatus: Equatable {
     /// extracting (0-33%), detecting (33-66%), encoding (66-100%)
     var overallProgress: Double {
         switch self {
-        case .pending:
+        case .pending, .cancelled, .failed:
             return 0
         case .downloading(let p):
             return p * 0.1  // 0-10%
@@ -72,8 +73,6 @@ enum JobStatus: Equatable {
             return 0.66 + p * 0.34  // 66-100%
         case .completed:
             return 1
-        case .failed:
-            return 0
         }
     }
 }
@@ -99,6 +98,9 @@ class ProcessingJob: Identifiable, ObservableObject {
 
     /// When processing started (for ETA calculation)
     var processingStartTime: Date?
+
+    /// Flag to request cancellation
+    var isCancellationRequested: Bool = false
 
     init(inputURL: URL, type: JobType, sourceURL: String? = nil, title: String? = nil) {
         self.inputURL = inputURL

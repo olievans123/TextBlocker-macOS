@@ -132,8 +132,8 @@ class SettingsService: ObservableObject {
     func resetToDefaults() {
         ocrHeight = 720
         sampleFPS = 2.0
-        padding = 14
-        mergePad = 6
+        padding = 18
+        mergePad = 10
         sceneThreshold = 8
         forceInterval = 2.0
         maxFilters = 1200

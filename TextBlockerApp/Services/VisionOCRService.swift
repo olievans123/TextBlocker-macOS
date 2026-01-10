@@ -52,13 +52,16 @@ actor VisionOCRService {
             // Use accurate mode for better detection (slower but finds more text)
             request.recognitionLevel = useAccurateMode ? .accurate : .fast
             request.recognitionLanguages = languages
-            request.usesLanguageCorrection = false
+            request.usesLanguageCorrection = true  // Helps with stylized/cursive text
             request.automaticallyDetectsLanguage = true  // Auto-detect languages not in list
 
-            // Set minimum text height if specified (0-1 normalized)
-            if minimumTextHeight > 0 {
-                request.minimumTextHeight = minimumTextHeight
+            // Use latest revision for best detection of varied fonts
+            if #available(macOS 13.0, *) {
+                request.revision = VNRecognizeTextRequestRevision3
             }
+
+            // Set minimum text height - use very small default to catch small text
+            request.minimumTextHeight = minimumTextHeight > 0 ? minimumTextHeight : 0.01
 
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
             do {

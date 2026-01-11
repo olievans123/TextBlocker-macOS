@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="TextBlockerApp/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="128" height="128" alt="TextBlocker Icon">
-</p>
-
-# TextBlocker for macOS
+# <img src="TextBlockerApp/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="32" height="32" alt="TextBlocker Icon"> TextBlocker for macOS
 
 A native macOS app that automatically detects and blocks text in videos using Apple's Vision framework.
 

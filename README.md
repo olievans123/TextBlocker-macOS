@@ -1,10 +1,12 @@
-# <img src="TextBlockerApp/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="32" height="32" alt="TextBlocker Icon"> TextBlocker for macOS
+# TextBlocker for macOS
+
+<img src="TextBlockerApp/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="80" height="80" alt="TextBlocker Icon" align="left" style="margin-right: 16px;">
 
 A native macOS app that automatically detects and blocks text in videos using Apple's Vision framework.
 
-![macOS](https://img.shields.io/badge/macOS-14.0+-blue)
-![Swift](https://img.shields.io/badge/Swift-5.9-orange)
-![License](https://img.shields.io/badge/license-MIT-green)
+![macOS](https://img.shields.io/badge/macOS-14.0+-blue) ![Swift](https://img.shields.io/badge/Swift-5.9-orange) ![License](https://img.shields.io/badge/license-MIT-green)
+
+<br clear="left">
 
 ## Features
 

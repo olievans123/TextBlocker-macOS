@@ -1,12 +1,14 @@
-# TextBlocker for macOS
+# Text Blocker for macOS
 
-<img src="TextBlockerApp/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="80" height="80" alt="TextBlocker Icon" align="left" style="margin-right: 16px;">
+<img src="TextBlockerApp/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="80" height="80" alt="Text Blocker Icon" align="left" style="margin-right: 16px;">
 
-A native macOS app that automatically detects and blocks text in videos using Apple's Vision framework.
+A native macOS app that automatically detects and blocks text/subtitles in videos using Apple's Vision framework.
 
 ![macOS](https://img.shields.io/badge/macOS-14.0+-blue) ![Swift](https://img.shields.io/badge/Swift-5.9-orange) ![License](https://img.shields.io/badge/license-MIT-green)
 
 <br clear="left">
+
+> **Perfect for ALG/Comprehensible Input language learning!** Block subtitles and on-screen text to focus on listening comprehension. Supports 24 languages including Chinese, Japanese, Korean, and more.
 
 ## Features
 

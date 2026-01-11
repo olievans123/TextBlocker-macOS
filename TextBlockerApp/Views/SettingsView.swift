@@ -1,7 +1,44 @@
 import SwiftUI
 
+struct SupportedLanguage: Identifiable {
+    let id: String  // Language code
+    let name: String
+    let flag: String
+
+    static let all: [SupportedLanguage] = [
+        // Common
+        SupportedLanguage(id: "en", name: "English", flag: "🇬🇧"),
+        SupportedLanguage(id: "es", name: "Spanish", flag: "🇪🇸"),
+        SupportedLanguage(id: "fr", name: "French", flag: "🇫🇷"),
+        SupportedLanguage(id: "de", name: "German", flag: "🇩🇪"),
+        SupportedLanguage(id: "it", name: "Italian", flag: "🇮🇹"),
+        SupportedLanguage(id: "pt", name: "Portuguese", flag: "🇵🇹"),
+        SupportedLanguage(id: "nl", name: "Dutch", flag: "🇳🇱"),
+        // Asian
+        SupportedLanguage(id: "zh-Hans", name: "Chinese (Simplified)", flag: "🇨🇳"),
+        SupportedLanguage(id: "zh-Hant", name: "Chinese (Traditional)", flag: "🇹🇼"),
+        SupportedLanguage(id: "ja", name: "Japanese", flag: "🇯🇵"),
+        SupportedLanguage(id: "ko", name: "Korean", flag: "🇰🇷"),
+        SupportedLanguage(id: "vi", name: "Vietnamese", flag: "🇻🇳"),
+        SupportedLanguage(id: "th", name: "Thai", flag: "🇹🇭"),
+        // Other European
+        SupportedLanguage(id: "ru", name: "Russian", flag: "🇷🇺"),
+        SupportedLanguage(id: "pl", name: "Polish", flag: "🇵🇱"),
+        SupportedLanguage(id: "uk", name: "Ukrainian", flag: "🇺🇦"),
+        SupportedLanguage(id: "cs", name: "Czech", flag: "🇨🇿"),
+        SupportedLanguage(id: "ro", name: "Romanian", flag: "🇷🇴"),
+        SupportedLanguage(id: "el", name: "Greek", flag: "🇬🇷"),
+        SupportedLanguage(id: "tr", name: "Turkish", flag: "🇹🇷"),
+        // Other
+        SupportedLanguage(id: "ar", name: "Arabic", flag: "🇸🇦"),
+        SupportedLanguage(id: "he", name: "Hebrew", flag: "🇮🇱"),
+        SupportedLanguage(id: "hi", name: "Hindi", flag: "🇮🇳"),
+    ]
+}
+
 struct SettingsView: View {
     @StateObject private var settings = SettingsService.shared
+    @State private var showLanguagePicker = false
 
     var body: some View {
         Form {
@@ -101,8 +138,56 @@ struct SettingsView: View {
                     .frame(width: 160)
                 }
 
-                TextField("Languages", text: languagesBinding)
-                    .help("Comma-separated language codes (e.g., en,es,fr)")
+                // Language selection
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Languages")
+                        Spacer()
+                        Button {
+                            showLanguagePicker.toggle()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("\(settings.languages.count) selected")
+                                    .foregroundColor(.secondary)
+                                Image(systemName: showLanguagePicker ? "chevron.up" : "chevron.down")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Show selected languages as tags
+                    if !settings.languages.isEmpty {
+                        FlowLayout(spacing: 4) {
+                            ForEach(settings.languages, id: \.self) { code in
+                                if let lang = SupportedLanguage.all.first(where: { $0.id == code }) {
+                                    HStack(spacing: 2) {
+                                        Text(lang.flag)
+                                        Text(lang.name)
+                                    }
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.accentColor.opacity(0.15))
+                                    .cornerRadius(12)
+                                } else {
+                                    Text(code)
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.secondary.opacity(0.15))
+                                        .cornerRadius(12)
+                                }
+                            }
+                        }
+                    }
+
+                    if showLanguagePicker {
+                        Divider()
+                        languagePickerGrid
+                    }
+                }
             }
 
             // Advanced Section
@@ -171,16 +256,46 @@ struct SettingsView: View {
         .frame(minWidth: 450)
     }
 
-    private var languagesBinding: Binding<String> {
-        Binding(
-            get: { settings.languages.joined(separator: ", ") },
-            set: { newValue in
-                settings.languages = newValue
-                    .split(separator: ",")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
+    @ViewBuilder
+    private var languagePickerGrid: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: 8) {
+            ForEach(SupportedLanguage.all) { lang in
+                Button {
+                    toggleLanguage(lang.id)
+                } label: {
+                    HStack {
+                        Text(lang.flag)
+                        Text(lang.name)
+                            .lineLimit(1)
+                        Spacer()
+                        if settings.languages.contains(lang.id) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.accentColor)
+                        } else {
+                            Image(systemName: "circle")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(settings.languages.contains(lang.id) ? Color.accentColor.opacity(0.1) : Color.clear)
+                    .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
             }
-        )
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func toggleLanguage(_ code: String) {
+        if let index = settings.languages.firstIndex(of: code) {
+            settings.languages.remove(at: index)
+        } else {
+            settings.languages.append(code)
+        }
     }
 
     @ViewBuilder
@@ -229,6 +344,51 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundColor(exists ? .secondary : .red)
         }
+    }
+}
+
+// MARK: - FlowLayout for displaying language tags
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
+        for (index, frame) in result.frames.enumerated() {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                proposal: ProposedViewSize(frame.size)
+            )
+        }
+    }
+
+    private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
+        let maxWidth = proposal.width ?? .infinity
+        var frames: [CGRect] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+
+            if x + size.width > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+        }
+
+        let totalHeight = y + rowHeight
+        return (CGSize(width: maxWidth, height: totalHeight), frames)
     }
 }
 

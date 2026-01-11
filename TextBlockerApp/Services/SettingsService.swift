@@ -137,8 +137,8 @@ class SettingsService: ObservableObject {
         let qualityRaw = defaults.string(forKey: qualityKey) ?? preset.quality
         self.quality = VideoQuality(rawValue: qualityRaw) ?? .balanced
 
-        // Include common Western languages by default for better text detection
-        self.languages = defaults.object(forKey: languagesKey) as? [String] ?? ["en", "fr", "de", "es", "it", "pt", "nl"]
+        // Include common languages by default for better text detection
+        self.languages = defaults.object(forKey: languagesKey) as? [String] ?? ["en", "zh-Hans", "zh-Hant", "ja", "ko", "es", "fr", "de"]
 
         // Output directory settings
         self.useCustomOutput = defaults.bool(forKey: useCustomOutputKey)
@@ -174,7 +174,7 @@ class SettingsService: ObservableObject {
         maxFilters = 1200
         skipSimilar = true
         useAccurateMode = true
-        languages = ["en", "fr", "de", "es", "it", "pt", "nl"]
+        languages = ["en", "zh-Hans", "zh-Hant", "ja", "ko", "es", "fr", "de"]
         useCustomOutput = false
         outputDirectory = nil
     }

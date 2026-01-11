@@ -9,11 +9,22 @@ struct InputView: View {
 
     private var isYouTubeURL: Bool {
         let patterns = [
-            #"youtube\.com/watch\?v=[\w-]+"#,
+            #"(www\.|m\.)?youtube\.com/watch\?.*v=[\w-]+"#,
             #"youtu\.be/[\w-]+"#,
-            #"youtube\.com/playlist\?list=[\w-]+"#
+            #"(www\.|m\.)?youtube\.com/playlist\?.*list=[\w-]+"#
         ]
         return patterns.contains { pattern in
+            urlText.range(of: pattern, options: .regularExpression) != nil
+        }
+    }
+
+    private var isPlaylistURL: Bool {
+        // Detect playlist URLs or video URLs with playlist context
+        let playlistPatterns = [
+            #"youtube\.com/playlist\?.*list=[\w-]+"#,
+            #"[?&]list=[\w-]+"#
+        ]
+        return playlistPatterns.contains { pattern in
             urlText.range(of: pattern, options: .regularExpression) != nil
         }
     }
@@ -70,11 +81,10 @@ struct InputView: View {
                             Label("Playlist", systemImage: "list.bullet.rectangle")
                         }
                         .toggleStyle(.checkbox)
-                        .onChange(of: urlText) { _, newValue in
-                            // Auto-detect playlist
-                            let hasPlaylist = newValue.contains("playlist?list=") || newValue.contains("list=")
-                            if hasPlaylist != isPlaylist {
-                                isPlaylist = hasPlaylist
+                        .onChange(of: urlText) { _, _ in
+                            // Auto-detect playlist from URL
+                            if isPlaylistURL != isPlaylist {
+                                isPlaylist = isPlaylistURL
                             }
                         }
 

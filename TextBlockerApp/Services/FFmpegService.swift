@@ -198,21 +198,58 @@ actor FFmpegService {
                 process.standardOutput = pipe
                 process.standardError = errorPipe
 
+                // Collect output data asynchronously to avoid pipe buffer deadlock
+                var outputData = Data()
+                var errorData = Data()
+                let outputLock = NSLock()
+                let errorLock = NSLock()
+
+                pipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        outputLock.lock()
+                        outputData.append(data)
+                        outputLock.unlock()
+                    }
+                }
+
+                errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        errorLock.lock()
+                        errorData.append(data)
+                        errorLock.unlock()
+                    }
+                }
+
                 do {
                     try process.run()
                     process.waitUntilExit()
 
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let output = String(data: data, encoding: .utf8) ?? ""
+                    // Stop reading handlers
+                    pipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
+
+                    // Read any remaining data
+                    outputLock.lock()
+                    outputData.append(pipe.fileHandleForReading.readDataToEndOfFile())
+                    outputLock.unlock()
+
+                    errorLock.lock()
+                    errorData.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
+                    errorLock.unlock()
+
+                    let output = String(data: outputData, encoding: .utf8) ?? ""
 
                     if process.terminationStatus != 0 {
-                        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
                         let errorOutput = String(data: errorData, encoding: .utf8) ?? "Unknown error"
                         continuation.resume(throwing: FFmpegError.processError(errorOutput))
                     } else {
                         continuation.resume(returning: output)
                     }
                 } catch {
+                    pipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
                     continuation.resume(throwing: error)
                 }
             }
@@ -225,13 +262,14 @@ actor FFmpegService {
         progressHandler: @escaping @Sendable (Double) -> Void
     ) async throws {
         try assertExecutableAvailable(ffmpegPath)
+        let executablePath = ffmpegPath  // Capture before dispatch to avoid actor deadlock
         // Use -progress pipe:1 to get progress updates
         let fullArgs = ["-progress", "pipe:1", "-nostats"] + args
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
-                process.executableURL = URL(fileURLWithPath: self.ffmpegPath)
+                process.executableURL = URL(fileURLWithPath: executablePath)
                 process.arguments = fullArgs
 
                 let pipe = Pipe()
@@ -261,6 +299,19 @@ actor FFmpegService {
                         DispatchQueue.main.async {
                             progressHandler(progress)
                         }
+                    }
+                }
+
+                // Collect error output asynchronously to avoid pipe buffer deadlock
+                var errorData = Data()
+                let errorLock = NSLock()
+
+                errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        errorLock.lock()
+                        errorData.append(data)
+                        errorLock.unlock()
                     }
                 }
 
@@ -295,19 +346,25 @@ actor FFmpegService {
                     process.waitUntilExit()
 
                     pipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
+
+                    // Read any remaining error data
+                    errorLock.lock()
+                    errorData.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
+                    errorLock.unlock()
 
                     if process.terminationStatus != 0 {
-                        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
                         let errorOutput = String(data: errorData, encoding: .utf8) ?? "Unknown error"
                         logger.error("FFmpeg error: \(errorOutput)")
                         continuation.resume(throwing: FFmpegError.processError(errorOutput))
                     } else {
-                        DispatchQueue.main.async {
-                            progressHandler(1.0)
-                        }
+                        // Don't call progressHandler(1.0) here - it would race with
+                        // the caller setting status to .completed, potentially overwriting it
                         continuation.resume(returning: ())
                     }
                 } catch {
+                    pipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
                     continuation.resume(throwing: error)
                 }
             }

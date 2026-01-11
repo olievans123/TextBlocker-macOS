@@ -24,6 +24,13 @@ struct MainView: View {
     @AppStorage("hasShownOnboarding") private var hasShownOnboarding = false
     @State private var previousCompletedCount = 0
 
+    private var completedJobCount: Int {
+        processingVM.jobs.filter {
+            if case .completed = $0.status { return true }
+            return false
+        }.count
+    }
+
     private var missingDependencies: [String] {
         var missing: [String] = []
         if !DependencyLocator.isInstalled("ffmpeg") {
@@ -88,7 +95,7 @@ struct MainView: View {
             }
         }
         // Show notification when job completes
-        .onChange(of: processingVM.jobs.map { $0.status }) { _, _ in
+        .onChange(of: completedJobCount) { _, _ in
             checkForCompletedJobs()
         }
         // Check dependencies on first launch

@@ -181,10 +181,11 @@ actor YTDLPService {
 
     private func runYTDLP(args: [String]) async throws -> String {
         try assertExecutableAvailable()
+        let executablePath = ytdlpPath  // Capture before dispatch to avoid actor deadlock
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
-                process.executableURL = URL(fileURLWithPath: self.ytdlpPath)
+                process.executableURL = URL(fileURLWithPath: executablePath)
                 process.arguments = args
 
                 let pipe = Pipe()
@@ -192,21 +193,58 @@ actor YTDLPService {
                 process.standardOutput = pipe
                 process.standardError = errorPipe
 
+                // Collect output data asynchronously to avoid pipe buffer deadlock
+                var outputData = Data()
+                var errorData = Data()
+                let outputLock = NSLock()
+                let errorLock = NSLock()
+
+                pipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        outputLock.lock()
+                        outputData.append(data)
+                        outputLock.unlock()
+                    }
+                }
+
+                errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty {
+                        errorLock.lock()
+                        errorData.append(data)
+                        errorLock.unlock()
+                    }
+                }
+
                 do {
                     try process.run()
                     process.waitUntilExit()
 
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let output = String(data: data, encoding: .utf8) ?? ""
+                    // Stop reading handlers
+                    pipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
+
+                    // Read any remaining data
+                    outputLock.lock()
+                    outputData.append(pipe.fileHandleForReading.readDataToEndOfFile())
+                    outputLock.unlock()
+
+                    errorLock.lock()
+                    errorData.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
+                    errorLock.unlock()
+
+                    let output = String(data: outputData, encoding: .utf8) ?? ""
 
                     if process.terminationStatus != 0 {
-                        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
                         let errorOutput = String(data: errorData, encoding: .utf8) ?? "Unknown error"
                         continuation.resume(throwing: YTDLPError.processError(errorOutput))
                     } else {
                         continuation.resume(returning: output)
                     }
                 } catch {
+                    pipe.fileHandleForReading.readabilityHandler = nil
+                    errorPipe.fileHandleForReading.readabilityHandler = nil
                     continuation.resume(throwing: error)
                 }
             }
@@ -219,10 +257,11 @@ actor YTDLPService {
         progressHandler: @escaping @Sendable (YTDLPProgressUpdate) -> Void
     ) async throws {
         try assertExecutableAvailable()
+        let executablePath = ytdlpPath  // Capture before dispatch to avoid actor deadlock
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
-                process.executableURL = URL(fileURLWithPath: self.ytdlpPath)
+                process.executableURL = URL(fileURLWithPath: executablePath)
                 process.arguments = ["--newline"] + args
 
                 let pipe = Pipe()

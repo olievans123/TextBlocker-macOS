@@ -23,6 +23,41 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
+            // Output Location Section
+            Section("Output Location") {
+                Toggle("Use custom output folder", isOn: $settings.useCustomOutput)
+
+                if settings.useCustomOutput {
+                    HStack {
+                        if let outputDir = settings.outputDirectory {
+                            Image(systemName: "folder.fill")
+                                .foregroundColor(.accentColor)
+                            Text(outputDir.path)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("No folder selected")
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button("Choose...") {
+                            selectOutputFolder()
+                        }
+                    }
+
+                    Text("Processed videos will be saved to this folder instead of next to the original")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Processed videos will be saved next to the original file")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
             // Quality Section
             Section("Output Quality") {
                 Picker("Quality", selection: $settings.quality) {
@@ -162,6 +197,20 @@ struct SettingsView: View {
         Text(description)
             .font(.caption)
             .foregroundColor(.secondary)
+    }
+
+    private func selectOutputFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.message = "Select output folder for processed videos"
+        panel.prompt = "Select"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            settings.outputDirectory = url
+        }
     }
 
     @ViewBuilder

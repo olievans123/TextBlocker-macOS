@@ -168,7 +168,9 @@ class ProcessingViewModel: ObservableObject {
             tempDir = dir
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
-            for (index, video) in videos.enumerated() {
+            // Create all jobs upfront with pending status so user can see full queue
+            var playlistJobs: [(job: ProcessingJob, video: YouTubeVideo, outputURL: URL)] = []
+            for video in videos {
                 let outputURL = await ytdlp.outputURL(forTitle: video.title, id: video.id, outputDir: dir)
                 let job = ProcessingJob(
                     inputURL: outputURL,
@@ -176,11 +178,27 @@ class ProcessingViewModel: ObservableObject {
                     sourceURL: video.id,
                     title: video.title
                 )
-                job.status = .downloading(progress: 0)
+                job.status = .pending
                 jobs.append(job)
+                playlistJobs.append((job: job, video: video, outputURL: outputURL))
+            }
 
+            let total = videos.count
+
+            // Now process each job sequentially
+            for (index, item) in playlistJobs.enumerated() {
+                let job = item.job
+                let video = item.video
+                let outputURL = item.outputURL
                 let idx = index + 1
-                let total = videos.count
+
+                // Skip if cancelled
+                guard !job.isCancellationRequested else {
+                    job.status = .cancelled
+                    continue
+                }
+
+                job.status = .downloading(progress: 0)
                 currentPhase = youtubePhaseText(
                     progress: 0,
                     stage: .downloading,
@@ -573,9 +591,7 @@ class ProcessingViewModel: ObservableObject {
     }
 
     private func generateOutputURL(for inputURL: URL) -> URL {
-        let directory = inputURL.deletingLastPathComponent()
-        let baseName = inputURL.deletingPathExtension().lastPathComponent
-        return directory.appendingPathComponent("\(baseName)_blocked.mp4")
+        return settings.outputURL(for: inputURL)
     }
 
     private func youtubePhaseText(

@@ -52,6 +52,8 @@ class SettingsService: ObservableObject {
     private let skipSimilarKey = "skipSimilar"
     private let selectedPresetKey = "selectedPreset"
     private let useAccurateModeKey = "useAccurateMode"
+    private let outputDirectoryKey = "outputDirectory"
+    private let useCustomOutputKey = "useCustomOutput"
 
     @Published var ocrHeight: Int {
         didSet { defaults.set(ocrHeight, forKey: ocrHeightKey) }
@@ -101,6 +103,23 @@ class SettingsService: ObservableObject {
         didSet { defaults.set(selectedPresetName, forKey: selectedPresetKey) }
     }
 
+    @Published var useCustomOutput: Bool {
+        didSet { defaults.set(useCustomOutput, forKey: useCustomOutputKey) }
+    }
+
+    @Published var outputDirectory: URL? {
+        didSet {
+            if let url = outputDirectory {
+                // Store as bookmark data to persist sandbox access
+                if let bookmark = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
+                    defaults.set(bookmark, forKey: outputDirectoryKey)
+                }
+            } else {
+                defaults.removeObject(forKey: outputDirectoryKey)
+            }
+        }
+    }
+
     init() {
         let preset = SettingsService.defaultPreset
 
@@ -120,6 +139,22 @@ class SettingsService: ObservableObject {
 
         // Include common Western languages by default for better text detection
         self.languages = defaults.object(forKey: languagesKey) as? [String] ?? ["en", "fr", "de", "es", "it", "pt", "nl"]
+
+        // Output directory settings
+        self.useCustomOutput = defaults.bool(forKey: useCustomOutputKey)
+
+        // Restore output directory from bookmark
+        if let bookmarkData = defaults.data(forKey: outputDirectoryKey) {
+            var isStale = false
+            if let url = try? URL(resolvingBookmarkData: bookmarkData, options: .withSecurityScope, relativeTo: nil, bookmarkDataIsStale: &isStale) {
+                _ = url.startAccessingSecurityScopedResource()
+                self.outputDirectory = url
+            } else {
+                self.outputDirectory = nil
+            }
+        } else {
+            self.outputDirectory = nil
+        }
     }
 
     func applyPreset(_ preset: Preset) {
@@ -140,5 +175,20 @@ class SettingsService: ObservableObject {
         skipSimilar = true
         useAccurateMode = true
         languages = ["en", "fr", "de", "es", "it", "pt", "nl"]
+        useCustomOutput = false
+        outputDirectory = nil
+    }
+
+    /// Returns the output URL for a processed video
+    func outputURL(for inputURL: URL) -> URL {
+        let baseName = inputURL.deletingPathExtension().lastPathComponent
+        let outputName = "\(baseName)_blocked.mp4"
+
+        if useCustomOutput, let outputDir = outputDirectory {
+            return outputDir.appendingPathComponent(outputName)
+        } else {
+            // Default: same directory as input
+            return inputURL.deletingLastPathComponent().appendingPathComponent(outputName)
+        }
     }
 }

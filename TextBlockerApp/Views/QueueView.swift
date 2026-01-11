@@ -3,14 +3,44 @@ import SwiftUI
 struct QueueView: View {
     @EnvironmentObject var processingVM: ProcessingViewModel
 
+    private var pendingCount: Int {
+        processingVM.jobs.filter { $0.status == .pending }.count
+    }
+
+    private var processingCount: Int {
+        processingVM.jobs.filter { $0.status.isProcessing }.count
+    }
+
+    private var completedCount: Int {
+        processingVM.jobs.filter {
+            if case .completed = $0.status { return true }
+            return false
+        }.count
+    }
+
+    private var failedCount: Int {
+        processingVM.jobs.filter {
+            if case .failed = $0.status { return true }
+            return false
+        }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Processing Queue")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("Processing Queue")
+                            .font(.title2)
+                            .fontWeight(.bold)
+
+                        if !processingVM.jobs.isEmpty {
+                            Text("\(processingVM.jobs.count) \(processingVM.jobs.count == 1 ? "video" : "videos")")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
 
                     if processingVM.isProcessing {
                         Text(processingVM.currentPhase)
@@ -21,7 +51,23 @@ struct QueueView: View {
 
                 Spacer()
 
+                // Queue stats badges
                 if !processingVM.jobs.isEmpty {
+                    HStack(spacing: 8) {
+                        if processingCount > 0 {
+                            StatBadge(count: processingCount, label: "Active", color: .blue)
+                        }
+                        if pendingCount > 0 {
+                            StatBadge(count: pendingCount, label: "Pending", color: .orange)
+                        }
+                        if completedCount > 0 {
+                            StatBadge(count: completedCount, label: "Done", color: .green)
+                        }
+                        if failedCount > 0 {
+                            StatBadge(count: failedCount, label: "Failed", color: .red)
+                        }
+                    }
+
                     Button("Clear Completed") {
                         withAnimation {
                             processingVM.clearCompleted()
@@ -282,6 +328,26 @@ struct JobCardView: View {
                 .help("Remove from queue")
             }
         }
+    }
+}
+
+struct StatBadge: View {
+    let count: Int
+    let label: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("\(count)")
+                .fontWeight(.semibold)
+            Text(label)
+        }
+        .font(.caption)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.15))
+        .foregroundColor(color)
+        .cornerRadius(6)
     }
 }
 
